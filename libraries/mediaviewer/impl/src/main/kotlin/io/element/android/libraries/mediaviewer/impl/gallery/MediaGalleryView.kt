@@ -231,7 +231,7 @@ private fun MediaGalleryPage(
             }
             is AsyncData.Failure -> {
                 ErrorContent(
-                    error = groupedMediaItems.error,
+                    onRetry = { state.eventSink(MediaGalleryEvents.ReloadTimeline) },
                 )
             }
             else -> Unit
@@ -454,10 +454,10 @@ private fun LoadingMoreIndicator(
 }
 
 @Composable
-private fun ErrorContent(error: Throwable) {
+private fun ErrorContent(onRetry: () -> Unit) {
     AsyncFailure(
-        throwable = error,
-        onRetry = null,
+        message = null,
+        onRetry = onRetry,
         modifier = Modifier.fillMaxSize(),
     )
 }

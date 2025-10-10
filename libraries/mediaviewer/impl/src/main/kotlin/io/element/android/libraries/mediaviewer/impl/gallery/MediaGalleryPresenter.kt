@@ -87,6 +87,9 @@ class MediaGalleryPresenter(
                 is MediaGalleryEvents.ChangeMode -> {
                     mode = event.mode
                 }
+                is MediaGalleryEvents.ReloadTimeline -> {
+                    mediaGalleryDataSource.start()
+                }
                 is MediaGalleryEvents.LoadMore -> coroutineScope.launch {
                     mediaGalleryDataSource.loadMore(event.direction)
                 }

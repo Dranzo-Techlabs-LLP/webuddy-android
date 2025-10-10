@@ -82,7 +82,7 @@ fun ViewFileView(
                         lines = state.lines.data.toImmutableList(),
                         colorationMode = state.colorationMode,
                     )
-                    is AsyncData.Failure -> AsyncFailure(throwable = state.lines.error, onRetry = null)
+                    is AsyncData.Failure -> AsyncFailure(message = state.lines.error.localizedMessage, onRetry = null)
                 }
             }
         }

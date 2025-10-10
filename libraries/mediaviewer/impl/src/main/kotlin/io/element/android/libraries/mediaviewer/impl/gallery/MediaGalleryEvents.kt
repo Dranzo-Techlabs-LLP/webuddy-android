@@ -29,4 +29,6 @@ sealed interface MediaGalleryEvents {
 
     data object CloseBottomSheet : MediaGalleryEvents
     data class Delete(val eventId: EventId) : MediaGalleryEvents
+
+    data object ReloadTimeline : MediaGalleryEvents
 }

@@ -97,6 +97,9 @@ class MediaViewerPresenter(
                 is MediaViewerEvents.ClearLoadingError -> {
                     dataSource.clearLoadingError(event.data)
                 }
+                is MediaViewerEvents.ReloadTimeline -> {
+                    dataSource.setup()
+                }
                 is MediaViewerEvents.SaveOnDisk -> {
                     mediaBottomSheetState = MediaBottomSheetState.Hidden
                     coroutineScope.saveOnDisk(event.data.downloadedMedia.value)

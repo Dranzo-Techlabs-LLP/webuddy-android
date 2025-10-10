@@ -65,7 +65,7 @@ private fun InvitePeopleViewError(
         contentAlignment = Alignment.Center,
     ) {
         AsyncFailure(
-            throwable = error,
+            message = error.localizedMessage,
             onRetry = null,
             modifier = Modifier.padding(horizontal = 16.dp),
         )

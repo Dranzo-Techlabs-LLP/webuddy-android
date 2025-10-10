@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
+import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
 
 interface MediaGalleryDataSource {
@@ -76,6 +77,9 @@ class TimelineMediaGalleryDataSource(
                     emit(it)
                 },
                 {
+                    // We couldn't load the timeline, so we reset the started state to allow retrying
+                    Timber.e(it, "Failed to get timeline for media gallery")
+                    isStarted.set(false)
                     groupedMediaItemsFlow.emit(AsyncData.Failure(it))
                 },
             )

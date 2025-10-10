@@ -25,7 +25,7 @@ import io.element.android.libraries.ui.strings.CommonStrings
 
 @Composable
 fun AsyncFailure(
-    throwable: Throwable,
+    message: String?,
     onRetry: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
@@ -35,7 +35,7 @@ fun AsyncFailure(
             .padding(vertical = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(text = throwable.message ?: stringResource(id = CommonStrings.error_unknown))
+        Text(text = message ?: stringResource(id = CommonStrings.error_unknown))
         if (onRetry != null) {
             Spacer(modifier = Modifier.height(24.dp))
             Button(
@@ -50,7 +50,7 @@ fun AsyncFailure(
 @Composable
 internal fun AsyncFailurePreview() = ElementPreview {
     AsyncFailure(
-        throwable = IllegalStateException("An error occurred"),
+        message = "An error occurred",
         onRetry = {}
     )
 }

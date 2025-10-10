@@ -127,8 +127,8 @@ fun MediaViewerView(
             when (val dataForPage = state.listData[page]) {
                 is MediaViewerPageData.Failure -> {
                     MediaViewerErrorPage(
-                        throwable = dataForPage.throwable,
                         onDismiss = onBackClick,
+                        onRetry = { state.eventSink(MediaViewerEvents.ReloadTimeline) },
                     )
                 }
                 is MediaViewerPageData.Loading -> {
@@ -394,8 +394,8 @@ private fun MediaViewerLoadingPage(
 
 @Composable
 private fun MediaViewerErrorPage(
-    throwable: Throwable,
     onDismiss: () -> Unit,
+    onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     MediaViewerFlickToDismiss(
@@ -409,8 +409,8 @@ private fun MediaViewerErrorPage(
             contentAlignment = Alignment.Center
         ) {
             AsyncFailure(
-                throwable = throwable,
-                onRetry = null
+                message = null,
+                onRetry = onRetry,
             )
         }
     }

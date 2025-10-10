@@ -16,6 +16,7 @@ sealed interface MediaViewerEvents {
     data class Share(val data: MediaViewerPageData.MediaViewerData) : MediaViewerEvents
     data class OpenWith(val data: MediaViewerPageData.MediaViewerData) : MediaViewerEvents
     data class ClearLoadingError(val data: MediaViewerPageData.MediaViewerData) : MediaViewerEvents
+    data object ReloadTimeline : MediaViewerEvents
     data class ViewInTimeline(val eventId: EventId) : MediaViewerEvents
     data class OpenInfo(val data: MediaViewerPageData.MediaViewerData) : MediaViewerEvents
     data class ConfirmDelete(

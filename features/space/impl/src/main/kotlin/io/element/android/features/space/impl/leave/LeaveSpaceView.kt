@@ -110,7 +110,7 @@ fun LeaveSpaceView(
                         }
                         is AsyncData.Failure -> item {
                             AsyncFailure(
-                                throwable = state.selectableSpaceRooms.error,
+                                message = state.selectableSpaceRooms.error.localizedMessage,
                                 onRetry = {
                                     state.eventSink(LeaveSpaceEvents.Retry)
                                 },
