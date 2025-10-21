@@ -9,8 +9,6 @@ package io.element.android.appnav
 
 import android.content.Intent
 import android.os.Parcelable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
@@ -21,8 +19,6 @@ import com.bumble.appyx.core.state.MutableSavedStateMap
 import com.bumble.appyx.navmodel.backstack.BackStack
 import com.bumble.appyx.navmodel.backstack.operation.pop
 import com.bumble.appyx.navmodel.backstack.operation.push
-import com.bumble.appyx.navmodel.backstack.transitionhandler.rememberBackstackFader
-import com.bumble.appyx.navmodel.backstack.transitionhandler.rememberBackstackSlider
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Assisted
 import dev.zacsweers.metro.AssistedInject
@@ -42,6 +38,8 @@ import io.element.android.features.signedout.api.SignedOutEntryPoint
 import io.element.android.libraries.accountselect.api.AccountSelectEntryPoint
 import io.element.android.libraries.architecture.BackstackView
 import io.element.android.libraries.architecture.BaseFlowNode
+import io.element.android.libraries.architecture.animation.rememberDefaultTransitionHandler
+import io.element.android.libraries.architecture.animation.rememberFaderTransitionHandler
 import io.element.android.libraries.architecture.appyx.rememberDelegateTransitionHandler
 import io.element.android.libraries.architecture.createNode
 import io.element.android.libraries.architecture.waitForChildAttached
@@ -172,15 +170,12 @@ class RootFlowNode(
             modifier = modifier,
             onOpenBugReport = this::onOpenBugReport,
         ) {
-            val backstackSlider = rememberBackstackSlider<NavTarget>(
-                transitionSpec = { spring(stiffness = Spring.StiffnessMediumLow) },
-            )
-            val backstackFader = rememberBackstackFader<NavTarget>(
-                transitionSpec = { spring(stiffness = Spring.StiffnessMediumLow) },
-            )
+            val backstackSlider = rememberDefaultTransitionHandler<NavTarget>()
+            val backstackFader = rememberFaderTransitionHandler<NavTarget>()
             val transitionHandler = rememberDelegateTransitionHandler<NavTarget, BackStack.State> { navTarget ->
                 when (navTarget) {
                     is NavTarget.SplashScreen,
+                    is NavTarget.NotLoggedInFlow,
                     is NavTarget.LoggedInFlow -> backstackFader
                     else -> backstackSlider
                 }

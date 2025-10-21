@@ -64,6 +64,9 @@ import io.element.android.features.userprofile.api.UserProfileEntryPoint
 import io.element.android.features.verifysession.api.IncomingVerificationEntryPoint
 import io.element.android.libraries.architecture.BackstackView
 import io.element.android.libraries.architecture.BaseFlowNode
+import io.element.android.libraries.architecture.animation.rememberDefaultTransitionHandler
+import io.element.android.libraries.architecture.animation.rememberFaderTransitionHandler
+import io.element.android.libraries.architecture.appyx.rememberDelegateTransitionHandler
 import io.element.android.libraries.architecture.createNode
 import io.element.android.libraries.architecture.waitForNavTargetAttached
 import io.element.android.libraries.designsystem.utils.snackbar.SnackbarDispatcher
@@ -540,7 +543,16 @@ class LoggedInFlowNode(
     override fun View(modifier: Modifier) {
         Box(modifier = modifier) {
             val ftueState by ftueService.state.collectAsState()
-            BackstackView()
+            val backstackSlider = rememberDefaultTransitionHandler<NavTarget>()
+            val backstackFader = rememberFaderTransitionHandler<NavTarget>()
+            val transitionHandler = rememberDelegateTransitionHandler<NavTarget, BackStack.State> { navTarget ->
+                when (navTarget) {
+                    NavTarget.Home,
+                    NavTarget.Ftue -> backstackFader
+                    else -> backstackSlider
+                }
+            }
+            BackstackView(transitionHandler = transitionHandler)
             if (ftueState is FtueState.Complete) {
                 PermanentChild(permanentNavModel = permanentNavModel, navTarget = NavTarget.LoggedInPermanent)
             }
