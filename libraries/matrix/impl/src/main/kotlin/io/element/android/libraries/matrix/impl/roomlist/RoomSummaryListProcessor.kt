@@ -8,38 +8,75 @@
 
 package io.element.android.libraries.matrix.impl.roomlist
 
+import io.element.android.libraries.core.coroutine.CoroutineDispatchers
 import io.element.android.libraries.matrix.api.roomlist.RoomSummary
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.matrix.rustcomponents.sdk.Room
 import org.matrix.rustcomponents.sdk.RoomListEntriesUpdate
 import org.matrix.rustcomponents.sdk.RoomListServiceInterface
-import org.matrix.rustcomponents.sdk.use
 import timber.log.Timber
+import java.util.LinkedList
 import kotlin.coroutines.CoroutineContext
+import kotlin.time.measureTime
 
 class RoomSummaryListProcessor(
     private val roomSummaries: MutableSharedFlow<List<RoomSummary>>,
     private val roomListService: RoomListServiceInterface,
     private val coroutineContext: CoroutineContext,
     private val roomSummaryDetailsFactory: RoomSummaryFactory = RoomSummaryFactory(),
+    coroutineDispatchers: CoroutineDispatchers,
 ) {
-    private val mutex = Mutex()
+    private val modifyPendingJobsMutex = Mutex()
+    private val updateSummariesMutex = Mutex()
+
+    private val coroutineScope = CoroutineScope(coroutineContext + coroutineDispatchers.computation)
+    private val pendingUpdateJobs = LinkedList<Job>()
 
     suspend fun postUpdate(updates: List<RoomListEntriesUpdate>) {
-        updateRoomSummaries {
-            Timber.v("Update rooms from postUpdates (with ${updates.size} items) on ${Thread.currentThread()}")
-            updates.forEach { update ->
-                applyUpdate(update)
+        val first = updates.firstOrNull()
+
+        modifyPendingJobsMutex.withLock {
+            // We can cancel any pending updates if we receive a Reset or Clear
+            if (first is RoomListEntriesUpdate.Reset || first is RoomListEntriesUpdate.Clear) {
+                while (pendingUpdateJobs.isNotEmpty()) {
+                    pendingUpdateJobs.removeFirst().cancel()
+                }
             }
 
-            // TODO remove once https://github.com/element-hq/element-x-android/issues/5031 has been confirmed as fixed
-            val duplicates = groupingBy { it.roomId }.eachCount().filter { it.value > 1 }
-            if (duplicates.isNotEmpty()) {
-                Timber.e("Found duplicates in room summaries after a list update from the SDK: $duplicates. Updates: $updates")
+            val job = coroutineScope.launch {
+                updateRoomSummaries {
+                    Timber.v("Update rooms from postUpdates (with ${updates.size} items) on ${Thread.currentThread()}")
+                    val elapsed = measureTime {
+                        for (update in updates) {
+                            applyUpdate(update)
+                        }
+
+                        // TODO remove once https://github.com/element-hq/element-x-android/issues/5031 has been confirmed as fixed
+                        val duplicates = groupingBy { it.roomId }.eachCount().filter { it.value > 1 }
+                        if (duplicates.isNotEmpty()) {
+                            Timber.e(
+                                "Found duplicates in room summaries after a list update from the SDK: $duplicates. Updates: ${updates.map { it.describe() }}"
+                            )
+                        }
+                    }
+                    Timber.d("Time to apply all updates: $elapsed")
+
+                    modifyPendingJobsMutex.withLock {
+                        // Remove the current job from the pending ones (done at the end so it can be cancelled)
+                        if (pendingUpdateJobs.isNotEmpty()) {
+                            pendingUpdateJobs.removeFirst()
+                        }
+                    }
+                }
             }
+
+            pendingUpdateJobs.add(job)
         }
     }
 
@@ -56,7 +93,7 @@ class RoomSummaryListProcessor(
 
     private suspend fun MutableList<RoomSummary>.applyUpdate(update: RoomListEntriesUpdate) {
         // Remove this comment to debug changes in the room list
-        // Timber.d("Apply room list update: ${update.describe()}")
+        // Timber.d("Apply room list update: ${update.describe(includeRoomNames = true)}")
         when (update) {
             is RoomListEntriesUpdate.Append -> {
                 val roomSummaries = update.values.map {
@@ -113,9 +150,9 @@ class RoomSummaryListProcessor(
     }
 
     private suspend fun updateRoomSummaries(block: suspend MutableList<RoomSummary>.() -> Unit) = withContext(coroutineContext) {
-        mutex.withLock {
+        updateSummariesMutex.withLock {
             val current = roomSummaries.replayCache.lastOrNull()
-            val mutableRoomSummaries = current.orEmpty().toMutableList()
+            val mutableRoomSummaries = current?.toMutableList() ?: mutableListOf()
             block(mutableRoomSummaries)
             roomSummaries.emit(mutableRoomSummaries)
         }

@@ -49,7 +49,7 @@ class RoomListDataSource(
         observeDateTimeChanges()
     }
 
-    private val _allRooms = MutableSharedFlow<ImmutableList<RoomListRoomSummary>>(replay = 1)
+    private val _allRooms = MutableSharedFlow<ImmutableList<RoomListRoomSummary>>(replay = 1, extraBufferCapacity = 5)
 
     private val lock = Mutex()
     private val diffCache = MutableListDiffCache<RoomListRoomSummary>()

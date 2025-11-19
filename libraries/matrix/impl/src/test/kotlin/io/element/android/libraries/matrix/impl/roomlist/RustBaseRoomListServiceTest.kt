@@ -52,6 +52,7 @@ private fun TestScope.createRustRoomListService(
     roomListFactory = RoomListFactory(
         innerRoomListService = roomListService,
         sessionCoroutineScope = backgroundScope,
+        coroutineDispatchers = testCoroutineDispatchers(),
     ),
     roomSyncSubscriber = RoomSyncSubscriber(
         roomListService = roomListService,

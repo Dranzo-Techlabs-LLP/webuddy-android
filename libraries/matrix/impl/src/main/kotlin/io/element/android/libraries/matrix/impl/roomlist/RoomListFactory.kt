@@ -8,6 +8,7 @@
 
 package io.element.android.libraries.matrix.impl.roomlist
 
+import io.element.android.libraries.core.coroutine.CoroutineDispatchers
 import io.element.android.libraries.matrix.api.roomlist.DynamicRoomList
 import io.element.android.libraries.matrix.api.roomlist.RoomList
 import io.element.android.libraries.matrix.api.roomlist.RoomListFilter
@@ -36,6 +37,7 @@ private val ROOM_LIST_RUST_FILTERS = listOf(
 internal class RoomListFactory(
     private val innerRoomListService: RoomListService,
     private val sessionCoroutineScope: CoroutineScope,
+    private val coroutineDispatchers: CoroutineDispatchers,
 ) {
     private val roomSummaryDetailsFactory: RoomSummaryFactory = RoomSummaryFactory()
 
@@ -50,9 +52,15 @@ internal class RoomListFactory(
         innerProvider: suspend () -> InnerRoomList
     ): DynamicRoomList {
         val loadingStateFlow: MutableStateFlow<RoomList.LoadingState> = MutableStateFlow(RoomList.LoadingState.NotLoaded)
-        val filteredSummariesFlow = MutableSharedFlow<List<RoomSummary>>(replay = 1, extraBufferCapacity = 1)
-        val summariesFlow = MutableSharedFlow<List<RoomSummary>>(replay = 1, extraBufferCapacity = 1)
-        val processor = RoomSummaryListProcessor(summariesFlow, innerRoomListService, coroutineContext, roomSummaryDetailsFactory)
+        val summariesFlow = MutableSharedFlow<List<RoomSummary>>(replay = 1, extraBufferCapacity = 5)
+        val filteredSummariesFlow = MutableSharedFlow<List<RoomSummary>>(replay = 1, extraBufferCapacity = 5)
+        val processor = RoomSummaryListProcessor(
+            roomSummaries = summariesFlow,
+            roomListService = innerRoomListService,
+            coroutineContext = coroutineContext,
+            roomSummaryDetailsFactory = roomSummaryDetailsFactory,
+            coroutineDispatchers = coroutineDispatchers,
+        )
         // Makes sure we don't miss any events
         val dynamicEvents = MutableSharedFlow<RoomListDynamicEvents>(replay = 100)
         val currentFilter = MutableStateFlow(initialFilter)

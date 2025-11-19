@@ -17,15 +17,18 @@ import io.element.android.libraries.matrix.test.A_ROOM_ID
 import io.element.android.libraries.matrix.test.A_ROOM_ID_2
 import io.element.android.libraries.matrix.test.A_ROOM_ID_3
 import io.element.android.libraries.matrix.test.room.aRoomSummary
+import io.element.android.tests.testutils.testCoroutineDispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Ignore
 import org.junit.Test
 import org.matrix.rustcomponents.sdk.RoomListEntriesUpdate
 
-class RoomSummaryListProcessorTest {
+@OptIn(ExperimentalCoroutinesApi::class) class RoomSummaryListProcessorTest {
     private val summaries = MutableStateFlow<List<RoomSummary>>(emptyList())
 
     @Ignore("JNA direct mapping has broken unit tests with FFI fakes")
@@ -36,6 +39,8 @@ class RoomSummaryListProcessorTest {
 
         val newEntry = aRustRoom(A_ROOM_ID_2)
         processor.postUpdate(listOf(RoomListEntriesUpdate.Append(listOf(newEntry, newEntry, newEntry))))
+
+        advanceUntilIdle()
 
         assertThat(summaries.value.count()).isEqualTo(4)
         assertThat(summaries.value.subList(1, 4).all { it.roomId == A_ROOM_ID_2 }).isTrue()
@@ -48,6 +53,8 @@ class RoomSummaryListProcessorTest {
         val processor = createProcessor()
         processor.postUpdate(listOf(RoomListEntriesUpdate.PushBack(aRustRoom(A_ROOM_ID_2))))
 
+        advanceUntilIdle()
+
         assertThat(summaries.value.count()).isEqualTo(2)
         assertThat(summaries.value.last().roomId).isEqualTo(A_ROOM_ID_2)
     }
@@ -58,6 +65,8 @@ class RoomSummaryListProcessorTest {
         summaries.value = listOf(aRoomSummary())
         val processor = createProcessor()
         processor.postUpdate(listOf(RoomListEntriesUpdate.PushFront(aRustRoom(A_ROOM_ID_2))))
+
+        advanceUntilIdle()
 
         assertThat(summaries.value.count()).isEqualTo(2)
         assertThat(summaries.value.first().roomId).isEqualTo(A_ROOM_ID_2)
@@ -72,6 +81,8 @@ class RoomSummaryListProcessorTest {
 
         processor.postUpdate(listOf(RoomListEntriesUpdate.Set(index.toUInt(), aRustRoom(A_ROOM_ID_2))))
 
+        advanceUntilIdle()
+
         assertThat(summaries.value.count()).isEqualTo(1)
         assertThat(summaries.value[index].roomId).isEqualTo(A_ROOM_ID_2)
     }
@@ -84,6 +95,8 @@ class RoomSummaryListProcessorTest {
         val index = 0
 
         processor.postUpdate(listOf(RoomListEntriesUpdate.Insert(index.toUInt(), aRustRoom(A_ROOM_ID_2))))
+
+        advanceUntilIdle()
 
         assertThat(summaries.value.count()).isEqualTo(2)
         assertThat(summaries.value[index].roomId).isEqualTo(A_ROOM_ID_2)
@@ -101,6 +114,8 @@ class RoomSummaryListProcessorTest {
 
         processor.postUpdate(listOf(RoomListEntriesUpdate.Remove(index.toUInt())))
 
+        advanceUntilIdle()
+
         assertThat(summaries.value.count()).isEqualTo(1)
         assertThat(summaries.value[index].roomId).isEqualTo(A_ROOM_ID_2)
     }
@@ -116,6 +131,8 @@ class RoomSummaryListProcessorTest {
         val index = 0
 
         processor.postUpdate(listOf(RoomListEntriesUpdate.PopBack))
+
+        advanceUntilIdle()
 
         assertThat(summaries.value.count()).isEqualTo(1)
         assertThat(summaries.value[index].roomId).isEqualTo(A_ROOM_ID)
@@ -133,6 +150,8 @@ class RoomSummaryListProcessorTest {
 
         processor.postUpdate(listOf(RoomListEntriesUpdate.PopFront))
 
+        advanceUntilIdle()
+
         assertThat(summaries.value.count()).isEqualTo(1)
         assertThat(summaries.value[index].roomId).isEqualTo(A_ROOM_ID_2)
     }
@@ -148,6 +167,8 @@ class RoomSummaryListProcessorTest {
 
         processor.postUpdate(listOf(RoomListEntriesUpdate.Clear))
 
+        advanceUntilIdle()
+
         assertThat(summaries.value).isEmpty()
     }
 
@@ -162,6 +183,8 @@ class RoomSummaryListProcessorTest {
         val index = 0
 
         processor.postUpdate(listOf(RoomListEntriesUpdate.Truncate(1u)))
+
+        advanceUntilIdle()
 
         assertThat(summaries.value.count()).isEqualTo(1)
         assertThat(summaries.value[index].roomId).isEqualTo(A_ROOM_ID)
@@ -179,6 +202,8 @@ class RoomSummaryListProcessorTest {
 
         processor.postUpdate(listOf(RoomListEntriesUpdate.Reset(listOf(aRustRoom(A_ROOM_ID_3)))))
 
+        advanceUntilIdle()
+
         assertThat(summaries.value.count()).isEqualTo(1)
         assertThat(summaries.value[index].roomId).isEqualTo(A_ROOM_ID_3)
     }
@@ -193,5 +218,6 @@ class RoomSummaryListProcessorTest {
         FakeFfiRoomListService(),
         coroutineContext = StandardTestDispatcher(testScheduler),
         roomSummaryDetailsFactory = RoomSummaryFactory(),
+        coroutineDispatchers = testCoroutineDispatchers(),
     )
 }
