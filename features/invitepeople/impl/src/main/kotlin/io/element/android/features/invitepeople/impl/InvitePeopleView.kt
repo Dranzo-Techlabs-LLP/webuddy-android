@@ -31,6 +31,8 @@ import io.element.android.libraries.designsystem.components.async.AsyncLoading
 import io.element.android.libraries.designsystem.components.avatar.AvatarSize
 import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.preview.PreviewsDayNight
+import io.element.android.libraries.designsystem.theme.components.HorizontalDivider
+import io.element.android.libraries.designsystem.theme.components.ListSectionHeader
 import io.element.android.libraries.designsystem.theme.components.SearchBar
 import io.element.android.libraries.designsystem.theme.components.SearchBarResultState
 import io.element.android.libraries.designsystem.theme.components.Text
@@ -100,14 +102,31 @@ private fun InvitePeopleContentView(
             onToggleUser = { state.eventSink(DefaultInvitePeopleEvents.ToggleUser(it)) },
         )
 
-        if (!state.isSearchActive) {
-            SelectedUsersRowList(
-                modifier = Modifier.fillMaxWidth(),
-                selectedUsers = state.selectedUsers,
-                autoScroll = true,
-                onUserRemove = { state.eventSink(DefaultInvitePeopleEvents.ToggleUser(it)) },
-                contentPadding = PaddingValues(16.dp),
-            )
+        if (!state.isSearchActive && state.suggestions.isNotEmpty()) {
+            LazyColumn {
+                item {
+                    ListSectionHeader(
+                        title = stringResource(id = CommonStrings.common_suggestions),
+                        hasDivider = false,
+                    )
+                }
+                itemsIndexed(state.suggestions) { index, invitableUser ->
+                    CheckableUserRow(
+                        checked = invitableUser.isSelected,
+                        onCheckedChange = {
+                            state.eventSink(DefaultInvitePeopleEvents.ToggleUser(invitableUser.matrixUser))
+                        },
+                        data = CheckableUserRowData.Resolved(
+                            avatarData = invitableUser.matrixUser.getAvatarData(AvatarSize.UserListItem),
+                            name = invitableUser.matrixUser.getBestName(),
+                            subtext = invitableUser.matrixUser.userId.value,
+                        ),
+                    )
+                    if (index < state.suggestions.lastIndex) {
+                        HorizontalDivider()
+                    }
+                }
+            }
         }
     }
 }
@@ -140,7 +159,7 @@ private fun InvitePeopleSearchBar(
                     selectedUsers = selectedUsers,
                     autoScroll = true,
                     onUserRemove = onToggleUser,
-                    contentPadding = PaddingValues(16.dp),
+                    contentPadding = PaddingValues(all = 16.dp),
                 )
             }
         },
