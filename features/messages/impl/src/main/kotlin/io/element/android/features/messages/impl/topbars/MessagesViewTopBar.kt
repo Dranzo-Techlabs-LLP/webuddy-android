@@ -64,7 +64,7 @@ internal fun MessagesViewTopBar(
     roomCallState: RoomCallState,
     dmUserIdentityState: IdentityState?,
     onRoomDetailsClick: () -> Unit,
-    onJoinCallClick: () -> Unit,
+    onJoinCallClick: (voiceIntent: Boolean) -> Unit,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
