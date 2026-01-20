@@ -11,6 +11,7 @@ package io.element.android.features.messages.impl.attachments.preview
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -140,13 +141,15 @@ class AttachmentsPreviewPresenter(
             }
         }
 
+        val displayMediaSelectorViews by snapshotFlow { mediaOptimizationSelectorState.displayMediaSelectorViews }.collectAsState(null)
+
         fun handleEvent(event: AttachmentsPreviewEvents) {
             when (event) {
                 is AttachmentsPreviewEvents.SendAttachment -> {
                     ongoingSendAttachmentJob.value = coroutineScope.launch {
                         // If the media optimization selector is displayed, we need to wait for the user to select the options
                         // before we can pre-process the media.
-                        if (mediaOptimizationSelectorState.displayMediaSelectorViews == true) {
+                        if (displayMediaSelectorViews == true) {
                             val config = MediaOptimizationConfig(
                                 compressImages = mediaOptimizationSelectorState.isImageOptimizationEnabled == true,
                                 videoCompressionPreset = mediaOptimizationSelectorState.selectedVideoPreset ?: VideoCompressionPreset.STANDARD,
