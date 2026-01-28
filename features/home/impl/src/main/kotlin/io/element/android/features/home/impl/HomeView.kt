@@ -74,7 +74,7 @@ fun HomeView(
     onSetUpRecoveryClick: () -> Unit,
     onConfirmRecoveryKeyClick: () -> Unit,
     onStartChatClick: () -> Unit,
-    onCreateSpaceClick: () -> Unit,
+    onCreateSpace: () -> Unit,
     onRoomSettingsClick: (roomId: RoomId) -> Unit,
     onMenuActionClick: (RoomListMenuAction) -> Unit,
     onReportRoomClick: (roomId: RoomId) -> Unit,
@@ -114,7 +114,7 @@ fun HomeView(
             onRoomClick = { if (firstThrottler.canHandle()) onRoomClick(it) },
             onOpenSettings = { if (firstThrottler.canHandle()) onSettingsClick() },
             onStartChatClick = { if (firstThrottler.canHandle()) onStartChatClick() },
-            onCreateSpaceClick = { if (firstThrottler.canHandle()) onCreateSpaceClick() },
+            onCreateSpaceClick = { if (firstThrottler.canHandle()) onCreateSpace() },
             onMenuActionClick = onMenuActionClick,
         )
         // This overlaid view will only be visible when state.displaySearchResults is true
@@ -184,6 +184,7 @@ private fun HomeScaffold(
                 filtersState = roomListState.filtersState,
                 canCreateSpaces = state.homeSpacesState.canCreateSpaces,
                 canReportBug = state.canReportBug,
+                credits = state.credits,
                 modifier = Modifier.hazeEffect(
                     state = hazeState,
                     style = HazeMaterials.thick(),
@@ -235,20 +236,13 @@ private fun HomeScaffold(
                         onRoomClick = ::onRoomClick,
                         onCreateRoomClick = onStartChatClick,
                         contentPadding = PaddingValues(
-                            // FAB height is 56dp, bottom padding is 16dp, we add 8dp as extra margin -> 56+16+8 = 80,
-                            // and include provided bottom padding
-                            // Disable contentPadding due to navigation issue using the keyboard
-                            // See https://issuetracker.google.com/issues/436432313
                             bottom = 80.dp,
-                            // bottom = 80.dp + padding.calculateBottomPadding(),
-                            // top = padding.calculateTopPadding()
                         ),
                         modifier = Modifier
                             .padding(
                                 PaddingValues(
                                     start = padding.calculateStartPadding(LocalLayoutDirection.current),
                                     end = padding.calculateEndPadding(LocalLayoutDirection.current),
-                                    // Remove these two lines once https://issuetracker.google.com/issues/436432313 has been fixed
                                     bottom = padding.calculateBottomPadding(),
                                     top = padding.calculateTopPadding()
                                 )
@@ -333,7 +327,7 @@ internal fun HomeViewPreview(@PreviewParameter(HomeStateProvider::class) state: 
         onSetUpRecoveryClick = {},
         onConfirmRecoveryKeyClick = {},
         onStartChatClick = {},
-        onCreateSpaceClick = {},
+        onCreateSpace = {},
         onRoomSettingsClick = {},
         onReportRoomClick = {},
         onMenuActionClick = {},
@@ -353,7 +347,7 @@ internal fun HomeViewA11yPreview() = ElementPreview {
         onSetUpRecoveryClick = {},
         onConfirmRecoveryKeyClick = {},
         onStartChatClick = {},
-        onCreateSpaceClick = {},
+        onCreateSpace = {},
         onRoomSettingsClick = {},
         onReportRoomClick = {},
         onMenuActionClick = {},

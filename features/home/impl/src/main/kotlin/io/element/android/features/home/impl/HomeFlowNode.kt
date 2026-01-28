@@ -121,6 +121,36 @@ class HomeFlowNode(
         }
     }
 
+    @Suppress("LongMethod")
+    override fun resolve(navTarget: NavTarget, buildContext: BuildContext): Node {
+        return when (navTarget) {
+            is NavTarget.ReportRoom -> {
+                reportRoomEntryPoint.createNode(
+                    parentNode = this,
+                    buildContext = buildContext,
+                    roomId = navTarget.roomId,
+                )
+            }
+            is NavTarget.DeclineInviteAndBlockUser -> {
+                declineInviteAndBlockUserEntryPoint.createNode(
+                    parentNode = this,
+                    buildContext = buildContext,
+                    inviteData = navTarget.inviteData,
+                )
+            }
+            is NavTarget.SelectNewOwnersWhenLeavingRoom -> {
+                val room = runBlocking { matrixClient.getJoinedRoom(navTarget.roomId) } ?: error("Room ${navTarget.roomId} not found")
+                changeRoomMemberRolesEntryPoint.createNode(
+                    parentNode = this,
+                    buildContext = buildContext,
+                    room = room,
+                    listType = ChangeRoomMemberRolesListType.SelectNewOwnersWhenLeaving,
+                )
+            }
+            NavTarget.Root -> rootNode(buildContext)
+        }
+    }
+
     sealed interface NavTarget : Parcelable {
         @Parcelize
         data object Root : NavTarget
@@ -150,6 +180,9 @@ class HomeFlowNode(
             }
             RoomListMenuAction.ReportBug -> {
                 callback.navigateToBugReport()
+            }
+            RoomListMenuAction.Wallet -> {
+                Timber.d("Wallet clicked")
             }
         }
     }
@@ -220,7 +253,7 @@ class HomeFlowNode(
                 onRoomClick = ::navigateToRoom,
                 onSettingsClick = callback::navigateToSettings,
                 onStartChatClick = callback::navigateToCreateRoom,
-                onCreateSpaceClick = callback::navigateToCreateSpace,
+                onCreateSpace = callback::navigateToCreateSpace,
                 onSetUpRecoveryClick = callback::navigateToSetUpRecovery,
                 onConfirmRecoveryKeyClick = callback::navigateToEnterRecoveryKey,
                 onRoomSettingsClick = callback::navigateToRoomSettings,
@@ -251,34 +284,5 @@ class HomeFlowNode(
     @Composable
     override fun View(modifier: Modifier) {
         BackstackView()
-    }
-
-    override fun resolve(navTarget: NavTarget, buildContext: BuildContext): Node {
-        return when (navTarget) {
-            is NavTarget.ReportRoom -> {
-                reportRoomEntryPoint.createNode(
-                    parentNode = this,
-                    buildContext = buildContext,
-                    roomId = navTarget.roomId,
-                )
-            }
-            is NavTarget.DeclineInviteAndBlockUser -> {
-                declineInviteAndBlockUserEntryPoint.createNode(
-                    parentNode = this,
-                    buildContext = buildContext,
-                    inviteData = navTarget.inviteData,
-                )
-            }
-            is NavTarget.SelectNewOwnersWhenLeavingRoom -> {
-                val room = runBlocking { matrixClient.getJoinedRoom(navTarget.roomId) } ?: error("Room ${navTarget.roomId} not found")
-                changeRoomMemberRolesEntryPoint.createNode(
-                    parentNode = this,
-                    buildContext = buildContext,
-                    room = room,
-                    listType = ChangeRoomMemberRolesListType.SelectNewOwnersWhenLeaving,
-                )
-            }
-            NavTarget.Root -> rootNode(buildContext)
-        }
     }
 }

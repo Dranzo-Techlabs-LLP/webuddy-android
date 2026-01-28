@@ -32,6 +32,7 @@ import io.element.android.libraries.indicator.api.IndicatorService
 import io.element.android.libraries.matrix.api.MatrixClient
 import io.element.android.libraries.matrix.api.sync.SyncService
 import io.element.android.libraries.sessionstorage.api.SessionStore
+import io.element.android.libraries.network.wallet.WalletService
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
@@ -48,6 +49,7 @@ class HomePresenter(
     private val rageshakeFeatureAvailability: RageshakeFeatureAvailability,
     private val sessionStore: SessionStore,
     private val announcementService: AnnouncementService,
+    private val walletService: WalletService,
 ) : Presenter<HomeState> {
     private val currentUserWithNeighborsBuilder = CurrentUserWithNeighborsBuilder()
 
@@ -72,10 +74,16 @@ class HomePresenter(
                 HomeNavigationBarItem.from(currentHomeNavigationBarItemOrdinal)
             }
         }
-        LaunchedEffect(Unit) {
+        
+        val credits by walletService.credits.collectAsState()
+
+        LaunchedEffect(client.sessionId) {
             // Force a refresh of the profile
             client.getUserProfile()
+            // Fetch wallet balance
+            walletService.refreshBalance(client.sessionId.value)
         }
+        
         // Avatar indicator
         val showAvatarIndicator by indicatorService.showRoomListTopBarIndicator()
         val directLogoutState = logoutPresenter.present()
@@ -95,7 +103,6 @@ class HomePresenter(
         }
 
         LaunchedEffect(homeSpacesState.spaceRooms.isEmpty()) {
-            // If the last space is left, ensure that the Chat view is rendered.
             if (homeSpacesState.spaceRooms.isEmpty()) {
                 currentHomeNavigationBarItemOrdinal = HomeNavigationBarItem.Chats.ordinal
             }
@@ -111,6 +118,7 @@ class HomePresenter(
             snackbarMessage = snackbarMessage,
             canReportBug = canReportBug,
             directLogoutState = directLogoutState,
+            credits = credits,
             eventSink = ::handleEvent,
         )
     }

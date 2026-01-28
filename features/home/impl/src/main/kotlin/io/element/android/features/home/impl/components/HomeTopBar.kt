@@ -8,14 +8,25 @@
 
 package io.element.android.features.home.impl.components
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
@@ -31,15 +42,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.element.android.appconfig.RoomListConfig
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.tokens.generated.CompoundIcons
 import io.element.android.features.home.impl.HomeNavigationBarItem
+import io.element.android.features.home.impl.HomeState
 import io.element.android.features.home.impl.R
 import io.element.android.features.home.impl.filters.RoomListFiltersState
 import io.element.android.features.home.impl.filters.RoomListFiltersView
@@ -57,6 +72,7 @@ import io.element.android.libraries.designsystem.theme.components.DropdownMenu
 import io.element.android.libraries.designsystem.theme.components.DropdownMenuItem
 import io.element.android.libraries.designsystem.theme.components.Icon
 import io.element.android.libraries.designsystem.theme.components.IconButton
+import io.element.android.libraries.designsystem.theme.components.SearchBar
 import io.element.android.libraries.designsystem.theme.components.Text
 import io.element.android.libraries.designsystem.theme.components.TopAppBar
 import io.element.android.libraries.matrix.api.core.SessionId
@@ -89,6 +105,7 @@ fun HomeTopBar(
     canReportBug: Boolean,
     displayFilters: Boolean,
     filtersState: RoomListFiltersState,
+    credits: Int?,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier) {
@@ -103,13 +120,21 @@ fun HomeTopBar(
                 scrolledContainerColor = Color.Transparent,
             ),
             title = {
-                Text(
-                    modifier = Modifier.semantics {
-                        heading()
-                    },
-                    style = ElementTheme.typography.aliasScreenTitle,
-                    text = title,
-                )
+                if (selectedNavigationItem == HomeNavigationBarItem.Chats) {
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        WalletCredits(
+                            credits = credits,
+                            modifier = Modifier.align(Alignment.Center),
+                            onClick = { onMenuActionClick(RoomListMenuAction.Wallet) }
+                        )
+                    }
+                } else {
+                    Text(
+                        modifier = Modifier.semantics { heading() },
+                        style = ElementTheme.typography.aliasScreenTitle,
+                        text = title,
+                    )
+                }
             },
             navigationIcon = {
                 NavigationIcon(
@@ -120,111 +145,92 @@ fun HomeTopBar(
                 )
             },
             actions = {
-                when (selectedNavigationItem) {
-                    HomeNavigationBarItem.Chats -> RoomListMenuItems(
-                        onToggleSearch = onToggleSearch,
-                        onMenuActionClick = onMenuActionClick,
-                        canReportBug = canReportBug
-                    )
-                    HomeNavigationBarItem.Spaces -> SpacesMenuItems(
-                        canCreateSpaces = canCreateSpaces,
-                        onCreateSpace = onCreateSpace
-                    )
+                if (selectedNavigationItem == HomeNavigationBarItem.Chats) {
+                    PlusButton(onClick = { /* Placeholder: Handle Add */ })
                 }
             },
-            // We want a 16dp left padding for the navigationIcon :
-            // 4dp from default TopAppBarHorizontalPadding
-            // 8dp from AccountIcon default padding (because of IconButton)
-            // 4dp extra padding using left insets
             windowInsets = WindowInsets(left = 4.dp),
         )
         if (displayFilters) {
             TopAppBarScrollBehaviorLayout(scrollBehavior = scrollBehavior) {
-                RoomListFiltersView(
-                    state = filtersState,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
+                Column {
+                    Text(
+                        text = "Chats",
+                        style = ElementTheme.typography.fontHeadingLgBold.copy(
+                            fontSize = 32.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        ),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                    SearchBar<String>(
+                        query = "",
+                        onQueryChange = {},
+                        active = false,
+                        onActiveChange = { onToggleSearch() },
+                        placeHolderTitle = "Search",
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                    RoomListFiltersView(
+                        state = filtersState,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun RoomListMenuItems(
-    onToggleSearch: () -> Unit,
-    onMenuActionClick: (RoomListMenuAction) -> Unit,
-    canReportBug: Boolean,
+private fun PlusButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    IconButton(
-        onClick = onToggleSearch,
+    Box(
+        modifier = modifier
+            .padding(end = 12.dp)
+            .size(32.dp)
+            .clip(CircleShape)
+            .background(ElementTheme.colors.bgActionPrimaryRest)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
     ) {
         Icon(
-            imageVector = CompoundIcons.Search(),
-            contentDescription = stringResource(CommonStrings.action_search),
+            imageVector = Icons.Default.Add,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+            tint = Color.White
         )
-    }
-    if (RoomListConfig.HAS_DROP_DOWN_MENU) {
-        var showMenu by remember { mutableStateOf(false) }
-        IconButton(
-            onClick = { showMenu = !showMenu }
-        ) {
-            Icon(
-                imageVector = CompoundIcons.OverflowVertical(),
-                contentDescription = null,
-            )
-        }
-        DropdownMenu(
-            expanded = showMenu,
-            onDismissRequest = { showMenu = false }
-        ) {
-            if (RoomListConfig.SHOW_INVITE_MENU_ITEM) {
-                DropdownMenuItem(
-                    onClick = {
-                        showMenu = false
-                        onMenuActionClick(RoomListMenuAction.InviteFriends)
-                    },
-                    text = { Text(stringResource(id = CommonStrings.action_invite)) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = CompoundIcons.ShareAndroid(),
-                            tint = ElementTheme.colors.iconSecondary,
-                            contentDescription = null,
-                        )
-                    }
-                )
-            }
-            if (RoomListConfig.SHOW_REPORT_PROBLEM_MENU_ITEM && canReportBug) {
-                DropdownMenuItem(
-                    onClick = {
-                        showMenu = false
-                        onMenuActionClick(RoomListMenuAction.ReportBug)
-                    },
-                    text = { Text(stringResource(id = CommonStrings.common_report_a_problem)) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = CompoundIcons.ChatProblem(),
-                            tint = ElementTheme.colors.iconSecondary,
-                            contentDescription = null,
-                        )
-                    }
-                )
-            }
-        }
     }
 }
 
 @Composable
-private fun SpacesMenuItems(
-    canCreateSpaces: Boolean,
-    onCreateSpace: () -> Unit
+private fun WalletCredits(
+    credits: Int?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    if (canCreateSpaces) {
-        IconButton(onClick = onCreateSpace) {
-            Icon(
-                imageVector = CompoundIcons.Plus(),
-                contentDescription = stringResource(CommonStrings.action_create_space)
-            )
-        }
+    val creditsText = if (credits != null) "$credits credits" else "Loading..."
+    Row(
+        modifier = modifier
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Default.Wallet,
+            contentDescription = stringResource(CommonStrings.common_wallet),
+            modifier = Modifier.size(20.dp),
+            tint = ElementTheme.colors.iconPrimary,
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = creditsText,
+            style = ElementTheme.typography.fontBodyMdMedium.copy(
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp
+            ),
+            color = ElementTheme.colors.textPrimary,
+        )
     }
 }
 
@@ -243,9 +249,7 @@ private fun NavigationIcon(
             onClick = onClick,
         )
     } else {
-        // Render a vertical pager
         val pagerState = rememberPagerState(initialPage = 1) { currentUserAndNeighbors.size }
-        // Listen to page changes and switch account if needed
         val latestOnAccountSwitch by rememberUpdatedState(onAccountSwitch)
         LaunchedEffect(pagerState) {
             snapshotFlow { pagerState.settledPage }.collect { page ->
@@ -260,11 +264,7 @@ private fun NavigationIcon(
                 matrixUser = currentUserAndNeighbors[page],
                 isCurrentAccount = page == 1,
                 showAvatarIndicator = page == 1 && showAvatarIndicator,
-                onClick = if (page == 1) {
-                    onClick
-                } else {
-                    {}
-                },
+                onClick = if (page == 1) onClick else {{}},
             )
         }
     }
@@ -309,7 +309,7 @@ private fun AccountIcon(
 internal fun HomeTopBarPreview() = ElementPreview {
     HomeTopBar(
         selectedNavigationItem = HomeNavigationBarItem.Chats,
-        title = stringResource(R.string.screen_roomlist_main_space_title),
+        title = "Chats",
         currentUserAndNeighbors = persistentListOf(MatrixUser(UserId("@id:domain"), "Alice")),
         showAvatarIndicator = false,
         areSearchResultsDisplayed = false,
@@ -322,75 +322,7 @@ internal fun HomeTopBarPreview() = ElementPreview {
         canReportBug = true,
         displayFilters = true,
         filtersState = aRoomListFiltersState(),
-        onMenuActionClick = {},
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@PreviewsDayNight
-@Composable
-internal fun HomeTopBarSpacesPreview() = ElementPreview {
-    HomeTopBar(
-        selectedNavigationItem = HomeNavigationBarItem.Spaces,
-        title = stringResource(R.string.screen_home_tab_spaces),
-        currentUserAndNeighbors = persistentListOf(MatrixUser(UserId("@id:domain"), "Alice")),
-        showAvatarIndicator = false,
-        areSearchResultsDisplayed = false,
-        scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState()),
-        onOpenSettings = {},
-        onAccountSwitch = {},
-        onToggleSearch = {},
-        onCreateSpace = {},
-        canCreateSpaces = true,
-        canReportBug = true,
-        displayFilters = false,
-        filtersState = aRoomListFiltersState(),
-        onMenuActionClick = {},
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@PreviewsDayNight
-@Composable
-internal fun HomeTopBarWithIndicatorPreview() = ElementPreview {
-    HomeTopBar(
-        selectedNavigationItem = HomeNavigationBarItem.Chats,
-        title = stringResource(R.string.screen_roomlist_main_space_title),
-        currentUserAndNeighbors = persistentListOf(MatrixUser(UserId("@id:domain"), "Alice")),
-        showAvatarIndicator = true,
-        areSearchResultsDisplayed = false,
-        scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState()),
-        onOpenSettings = {},
-        onAccountSwitch = {},
-        onToggleSearch = {},
-        onCreateSpace = {},
-        canCreateSpaces = true,
-        canReportBug = true,
-        displayFilters = true,
-        filtersState = aRoomListFiltersState(),
-        onMenuActionClick = {},
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@PreviewsDayNight
-@Composable
-internal fun HomeTopBarMultiAccountPreview() = ElementPreview {
-    HomeTopBar(
-        selectedNavigationItem = HomeNavigationBarItem.Chats,
-        title = stringResource(R.string.screen_roomlist_main_space_title),
-        currentUserAndNeighbors = aMatrixUserList().take(3).toImmutableList(),
-        showAvatarIndicator = false,
-        areSearchResultsDisplayed = false,
-        scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState()),
-        onOpenSettings = {},
-        onAccountSwitch = {},
-        onToggleSearch = {},
-        onCreateSpace = {},
-        canCreateSpaces = true,
-        canReportBug = true,
-        displayFilters = true,
-        filtersState = aRoomListFiltersState(),
+        credits = 300,
         onMenuActionClick = {},
     )
 }
