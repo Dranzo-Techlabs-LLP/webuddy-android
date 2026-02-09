@@ -9,8 +9,15 @@ package io.element.android.libraries.network.wallet
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 @Serializable
 data class WalletResponse(
-    @SerialName("current_hold") val currentHold: String
+    @SerialName("current_hold") val currentHold: JsonElement? = null,
+    @SerialName("max_credits") val maxCredits: JsonElement? = null
+)
+
+@Serializable
+data class WalletUpdateRequest(
+    @SerialName("max_credits") val maxCredits: Int
 )

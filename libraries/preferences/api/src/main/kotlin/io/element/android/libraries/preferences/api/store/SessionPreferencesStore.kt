@@ -35,5 +35,8 @@ interface SessionPreferencesStore {
     suspend fun setVideoCompressionPreset(preset: VideoCompressionPreset)
     fun getVideoCompressionPreset(): Flow<VideoCompressionPreset>
 
+    suspend fun setMaxCredits(maxCredits: Int)
+    fun getMaxCredits(): Flow<Int?>
+
     suspend fun clear()
 }

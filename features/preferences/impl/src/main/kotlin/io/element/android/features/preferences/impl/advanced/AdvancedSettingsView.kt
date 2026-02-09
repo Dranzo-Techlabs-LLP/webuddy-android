@@ -8,15 +8,37 @@
 
 package io.element.android.features.preferences.impl.advanced
 
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.PreviewParameter
+import io.element.android.libraries.architecture.AsyncAction
 import im.vector.app.features.analytics.plan.Interaction
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.features.preferences.impl.R
@@ -39,6 +61,7 @@ import io.element.android.libraries.designsystem.theme.components.ListSupporting
 import io.element.android.libraries.designsystem.theme.components.Text
 import io.element.android.libraries.designsystem.utils.snackbar.LocalSnackbarDispatcher
 import io.element.android.libraries.designsystem.utils.snackbar.SnackbarHost
+import io.element.android.libraries.designsystem.utils.snackbar.SnackbarMessage
 import io.element.android.libraries.designsystem.utils.snackbar.collectSnackbarMessageAsState
 import io.element.android.libraries.designsystem.utils.snackbar.rememberSnackbarHostState
 import io.element.android.libraries.matrix.api.media.MediaPreviewValue
@@ -184,6 +207,95 @@ fun AdvancedSettingsView(
                             displaySelectorDialog = false
                         },
                         onDismiss = { displaySelectorDialog = false },
+                    )
+                }
+            }
+        }
+
+        // Local state for the input field to allow smooth typing
+        var maxCreditsInput by remember(state.maxCredits) {
+            mutableStateOf(state.maxCredits?.toString() ?: "")
+        }
+        var isFocused by remember { mutableStateOf(false) }
+
+        // Show error snackbar if wallet action fails
+        LaunchedEffect(state.walletAction) {
+            if (state.walletAction is AsyncAction.Failure) {
+                snackbarDispatcher.post(SnackbarMessage(CommonStrings.common_error))
+                state.eventSink(AdvancedSettingsEvents.ClearWalletActionError)
+            }
+        }
+
+        PreferenceCategory(
+            title = stringResource(id = CommonStrings.common_wallet),
+            showTopDivider = true,
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Max Credits",
+                    style = ElementTheme.typography.fontBodyLgMedium,
+                    modifier = Modifier.weight(1f)
+                )
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                if (state.maxCredits == null || state.walletAction.isLoading()) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp,
+                        color = ElementTheme.colors.iconPrimary
+                    )
+                } else {
+                    BasicTextField(
+                        value = maxCreditsInput,
+                        onValueChange = { newValue ->
+                            if (newValue.isEmpty() || newValue.all { it.isDigit() }) {
+                                maxCreditsInput = newValue
+                                newValue.toIntOrNull()?.let {
+                                    state.eventSink(AdvancedSettingsEvents.SetMaxCredits(it))
+                                }
+                            }
+                        },
+                        modifier = Modifier
+                            .width(80.dp)
+                            .onFocusChanged { focusState ->
+                                if (isFocused && !focusState.isFocused) {
+                                    // Focus lost - auto save if changed
+                                    if (maxCreditsInput.isNotEmpty() &&
+                                        maxCreditsInput != (state.originalMaxCredits?.toString() ?: "")) {
+                                        state.eventSink(AdvancedSettingsEvents.SaveMaxCredits)
+                                    }
+                                }
+                                isFocused = focusState.isFocused
+                            }
+                            .border(
+                                width = 1.dp,
+                                color = Color.Black,
+                                shape = RoundedCornerShape(4.dp)
+                            )
+                            .padding(8.dp),
+                        textStyle = ElementTheme.typography.fontBodyLgRegular.copy(
+                            color = ElementTheme.colors.textPrimary,
+                            textAlign = TextAlign.Start
+                        ),
+                        cursorBrush = SolidColor(ElementTheme.colors.iconPrimary),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Number,
+                            imeAction = ImeAction.Done,
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                if (maxCreditsInput.isNotEmpty()) {
+                                    state.eventSink(AdvancedSettingsEvents.SaveMaxCredits)
+                                }
+                            }
+                        ),
+                        singleLine = true,
                     )
                 }
             }

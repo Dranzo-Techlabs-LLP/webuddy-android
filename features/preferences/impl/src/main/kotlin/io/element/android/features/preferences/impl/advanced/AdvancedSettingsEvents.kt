@@ -20,4 +20,7 @@ sealed interface AdvancedSettingsEvents {
     data class SetTheme(val theme: ThemeOption) : AdvancedSettingsEvents
     data class SetTimelineMediaPreviewValue(val value: MediaPreviewValue) : AdvancedSettingsEvents
     data class SetHideInviteAvatars(val value: Boolean) : AdvancedSettingsEvents
+    data class SetMaxCredits(val maxCredits: Int) : AdvancedSettingsEvents
+    object SaveMaxCredits : AdvancedSettingsEvents
+    object ClearWalletActionError : AdvancedSettingsEvents
 }

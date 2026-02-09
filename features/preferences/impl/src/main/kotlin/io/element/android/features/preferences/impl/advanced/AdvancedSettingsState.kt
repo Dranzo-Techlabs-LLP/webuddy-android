@@ -11,6 +11,7 @@ package io.element.android.features.preferences.impl.advanced
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.res.stringResource
+import io.element.android.libraries.architecture.AsyncAction
 import io.element.android.libraries.designsystem.components.preferences.DropdownOption
 import io.element.android.libraries.preferences.api.store.VideoCompressionPreset
 import io.element.android.libraries.ui.strings.CommonStrings
@@ -21,6 +22,9 @@ data class AdvancedSettingsState(
     val mediaOptimizationState: MediaOptimizationState?,
     val theme: ThemeOption,
     val mediaPreviewConfigState: MediaPreviewConfigState,
+    val maxCredits: Int?,
+    val originalMaxCredits: Int?,
+    val walletAction: AsyncAction<Unit>,
     val eventSink: (AdvancedSettingsEvents) -> Unit
 )
 

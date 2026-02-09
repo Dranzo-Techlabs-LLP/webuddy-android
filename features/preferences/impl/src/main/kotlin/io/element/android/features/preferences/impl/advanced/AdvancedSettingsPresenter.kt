@@ -28,6 +28,13 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import io.element.android.libraries.architecture.AsyncAction
+import io.element.android.libraries.architecture.runCatchingUpdatingState
+import io.element.android.libraries.matrix.api.MatrixClient
+import io.element.android.libraries.network.wallet.WalletService
+
 @Inject
 class AdvancedSettingsPresenter(
     private val appPreferencesStore: AppPreferencesStore,
@@ -36,6 +43,8 @@ class AdvancedSettingsPresenter(
     @SessionCoroutineScope
     private val sessionCoroutineScope: CoroutineScope,
     private val featureFlagService: FeatureFlagService,
+    private val walletService: WalletService,
+    private val matrixClient: MatrixClient,
 ) : Presenter<AdvancedSettingsState> {
     @Composable
     override fun present(): AdvancedSettingsState {
@@ -83,6 +92,16 @@ class AdvancedSettingsPresenter(
             }.collect()
         }
 
+        val maxCredits by walletService.maxCredits.collectAsState()
+        val originalMaxCredits by walletService.originalMaxCredits.collectAsState()
+        val walletAction = remember { mutableStateOf<AsyncAction<Unit>>(AsyncAction.Uninitialized) }
+
+        LaunchedEffect(Unit) {
+            walletAction.runCatchingUpdatingState {
+                walletService.refreshBalance(matrixClient.sessionId.value)
+            }
+        }
+
         fun handleEvent(event: AdvancedSettingsEvents) {
             when (event) {
                 is AdvancedSettingsEvents.SetDeveloperModeEnabled -> sessionCoroutineScope.launch {
@@ -109,6 +128,20 @@ class AdvancedSettingsPresenter(
                 is AdvancedSettingsEvents.SetVideoUploadQuality -> sessionCoroutineScope.launch {
                     sessionPreferencesStore.setVideoCompressionPreset(event.videoPreset)
                 }
+                is AdvancedSettingsEvents.SetMaxCredits -> {
+                    walletService.setMaxCredits(event.maxCredits)
+                }
+                is AdvancedSettingsEvents.SaveMaxCredits -> {
+                    sessionCoroutineScope.launch {
+                        val currentAmount = maxCredits ?: return@launch
+                        walletAction.runCatchingUpdatingState {
+                            walletService.updateMaxCredits(matrixClient.sessionId.value, currentAmount)
+                        }
+                    }
+                }
+                is AdvancedSettingsEvents.ClearWalletActionError -> {
+                    walletAction.value = AsyncAction.Uninitialized
+                }
             }
         }
 
@@ -118,6 +151,9 @@ class AdvancedSettingsPresenter(
             mediaOptimizationState = mediaOptimizationState,
             theme = themeOption,
             mediaPreviewConfigState = mediaPreviewConfigState,
+            maxCredits = maxCredits,
+            originalMaxCredits = originalMaxCredits,
+            walletAction = walletAction.value,
             eventSink = ::handleEvent,
         )
     }

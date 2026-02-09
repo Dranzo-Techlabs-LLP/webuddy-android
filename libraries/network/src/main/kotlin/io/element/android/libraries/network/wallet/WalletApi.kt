@@ -7,12 +7,20 @@
 
 package io.element.android.libraries.network.wallet
 
+import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.Path
 
 interface WalletApi {
     @GET("v1/users/{userId}")
     suspend fun getWalletBalance(
-        @Path("userId") userId: String
+        @Path("userId", encoded = true) userId: String
+    ): WalletResponse
+
+    @PATCH("v1/users/{userId}")
+    suspend fun updateWallet(
+        @Path("userId", encoded = true) userId: String,
+        @Body request: WalletUpdateRequest
     ): WalletResponse
 }
