@@ -123,7 +123,8 @@ internal fun RoomSummaryRow(
                     NameAndTimestampRow(
                         name = room.name,
                         timestamp = room.timestamp,
-                        isHighlighted = room.isHighlighted
+                        isHighlighted = room.isHighlighted,
+                        credits = room.credits,
                     )
                     MessagePreviewAndIndicatorRow(room = room)
                 }
@@ -139,7 +140,8 @@ internal fun RoomSummaryRow(
                     NameAndTimestampRow(
                         name = room.name,
                         timestamp = null,
-                        isHighlighted = room.isHighlighted
+                        isHighlighted = room.isHighlighted,
+                        credits = room.credits,
                     )
                     if (room.canonicalAlias != null) {
                         Text(
@@ -215,6 +217,7 @@ private fun NameAndTimestampRow(
     name: String?,
     timestamp: String?,
     isHighlighted: Boolean,
+    credits: Int? = null,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -235,16 +238,25 @@ private fun NameAndTimestampRow(
                 overflow = TextOverflow.Ellipsis
             )
         }
-        // Timestamp
-        Text(
-            text = timestamp ?: "",
-            style = ElementTheme.typography.fontBodySmMedium,
-            color = if (isHighlighted) {
-                ElementTheme.colors.unreadIndicator
-            } else {
-                ElementTheme.colors.roomListRoomMessageDate
-            },
-        )
+        Column(horizontalAlignment = Alignment.End) {
+            // Timestamp
+            Text(
+                text = timestamp ?: "",
+                style = ElementTheme.typography.fontBodySmMedium,
+                color = if (isHighlighted) {
+                    ElementTheme.colors.unreadIndicator
+                } else {
+                    ElementTheme.colors.roomListRoomMessageDate
+                },
+            )
+            if (credits != null) {
+                Text(
+                    text = "$credits credits",
+                    style = ElementTheme.typography.fontBodySmMedium,
+                    color = ElementTheme.colors.roomListRoomMessageDate,
+                )
+            }
+        }
     }
 }
 

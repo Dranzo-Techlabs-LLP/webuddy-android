@@ -110,8 +110,9 @@ class RoomListDataSource(
         data class CacheResult(val index: Int, val fromCache: Boolean)
         val cachingResults = mutableMapOf<RoomId, MutableList<CacheResult>>()
 
-        val roomListRoomSummaries = diffCache.indices().mapNotNull { index ->
-            if (useCache) {
+        val roomListRoomSummaries = mutableListOf<RoomListRoomSummary>()
+        for (index in diffCache.indices()) {
+            val item = if (useCache) {
                 diffCache.get(index)?.let { cachedItem ->
                     // Add the cached item to the caching results
                     val pairs = cachingResults.getOrDefault(cachedItem.roomId, mutableListOf())
@@ -136,6 +137,9 @@ class RoomListDataSource(
                 }
                 buildAndCacheItem(roomSummaries, index)
             }
+            if (item != null) {
+                roomListRoomSummaries.add(item)
+            }
         }
 
         // TODO remove once https://github.com/element-hq/element-x-android/issues/5031 has been confirmed as fixed
@@ -155,7 +159,7 @@ class RoomListDataSource(
         }
     }
 
-    private fun buildAndCacheItem(roomSummaries: List<RoomSummary>, index: Int): RoomListRoomSummary? {
+    private suspend fun buildAndCacheItem(roomSummaries: List<RoomSummary>, index: Int): RoomListRoomSummary? {
         val roomListSummary = roomSummaries.getOrNull(index)?.let { roomListRoomSummaryFactory.create(it) }
         diffCache[index] = roomListSummary
         return roomListSummary

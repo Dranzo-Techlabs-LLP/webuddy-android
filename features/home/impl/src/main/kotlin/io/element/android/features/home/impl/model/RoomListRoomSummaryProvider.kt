@@ -132,6 +132,11 @@ open class RoomListRoomSummaryProvider : PreviewParameterProvider<RoomListRoomSu
             listOf(
                 aRoomListRoomSummary(latestEvent = LatestEvent.Sending("A sending message")),
                 aRoomListRoomSummary(latestEvent = LatestEvent.Error),
+                aRoomListRoomSummary(
+                    name = "imran1993",
+                    credits = 500,
+                    heroUserId = UserId("@imran1993:matrix.org")
+                ),
             )
         ).flatten()
 }
@@ -168,6 +173,8 @@ internal fun aRoomListRoomSummary(
     heroes: List<AvatarData> = emptyList(),
     isTombstoned: Boolean = false,
     isSpace: Boolean = false,
+    credits: Int? = null,
+    heroUserId: UserId? = null,
 ) = RoomListRoomSummary(
     id = id,
     roomId = RoomId(id),
@@ -189,5 +196,7 @@ internal fun aRoomListRoomSummary(
     canonicalAlias = canonicalAlias,
     heroes = heroes.toImmutableList(),
     isTombstoned = isTombstoned,
-    isSpace = isSpace
+    isSpace = isSpace,
+    credits = credits,
+    heroUserId = heroUserId,
 )

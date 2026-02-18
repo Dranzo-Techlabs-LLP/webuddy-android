@@ -12,11 +12,15 @@ import io.element.android.libraries.dateformatter.api.DateFormatter
 import io.element.android.libraries.dateformatter.test.FakeDateFormatter
 import io.element.android.libraries.eventformatter.api.RoomLatestEventFormatter
 import io.element.android.libraries.eventformatter.test.FakeRoomLatestEventFormatter
+import io.element.android.libraries.network.wallet.WalletService
+import io.mockk.mockk
 
 fun aRoomListRoomSummaryFactory(
     dateFormatter: DateFormatter = FakeDateFormatter { _, _, _ -> "Today" },
     roomLatestEventFormatter: RoomLatestEventFormatter = FakeRoomLatestEventFormatter(),
+    walletService: WalletService = mockk(relaxed = true),
 ) = RoomListRoomSummaryFactory(
     dateFormatter = dateFormatter,
     roomLatestEventFormatter = roomLatestEventFormatter,
+    walletService = walletService,
 )

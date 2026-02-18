@@ -23,16 +23,26 @@ import io.element.android.libraries.matrix.api.roomlist.LatestEventValue
 import io.element.android.libraries.matrix.api.roomlist.RoomSummary
 import io.element.android.libraries.matrix.ui.model.getAvatarData
 import io.element.android.libraries.matrix.ui.model.toInviteSender
+import io.element.android.libraries.network.wallet.WalletService
 import kotlinx.collections.immutable.toImmutableList
+import timber.log.Timber
 
 @Inject
 class RoomListRoomSummaryFactory(
     private val dateFormatter: DateFormatter,
     private val roomLatestEventFormatter: RoomLatestEventFormatter,
+    private val walletService: WalletService,
 ) {
-    fun create(roomSummary: RoomSummary): RoomListRoomSummary {
+    suspend fun create(roomSummary: RoomSummary): RoomListRoomSummary {
         val roomInfo = roomSummary.info
         val avatarData = roomInfo.getAvatarData(size = AvatarSize.RoomListItem)
+        val heroUserId = if (roomSummary.isOneToOne) roomInfo.heroes.firstOrNull()?.userId else null
+        
+        Timber.d("Processing room ${roomInfo.name}. Hero: ${heroUserId?.value}")
+        
+        // Use the full Matrix ID (e.g. @shinky777:matrix.org) to match Webuddy_name in DB
+        val credits = heroUserId?.let { walletService.getMaxCredits(it.value) }
+        
         return RoomListRoomSummary(
             id = roomSummary.roomId.value,
             roomId = roomSummary.roomId,
@@ -71,6 +81,8 @@ class RoomListRoomSummaryFactory(
             }.toImmutableList(),
             isTombstoned = roomInfo.successorRoom != null,
             isSpace = roomInfo.isSpace,
+            heroUserId = heroUserId,
+            credits = credits
         )
     }
 
