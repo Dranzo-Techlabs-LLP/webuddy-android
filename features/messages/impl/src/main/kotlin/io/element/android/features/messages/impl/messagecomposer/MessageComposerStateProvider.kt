@@ -32,6 +32,10 @@ fun aMessageComposerState(
     showAttachmentSourcePicker: Boolean = false,
     canShareLocation: Boolean = true,
     suggestions: ImmutableList<ResolvedSuggestion> = persistentListOf(),
+    isRestricted: Boolean = false,
+    isWalletLoaded: Boolean = true,
+    credits: Int? = 150,
+    maxCredits: Int? = 100,
     eventSink: (MessageComposerEvent) -> Unit = {},
 ) = MessageComposerState(
     textEditorState = textEditorState,
@@ -43,5 +47,9 @@ fun aMessageComposerState(
     suggestions = suggestions,
     resolveMentionDisplay = { _, _ -> TextDisplay.Plain },
     resolveAtRoomMentionDisplay = { TextDisplay.Plain },
+    isRestricted = isRestricted,
+    isWalletLoaded = isWalletLoaded,
+    credits = credits,
+    maxCredits = maxCredits,
     eventSink = eventSink,
 )

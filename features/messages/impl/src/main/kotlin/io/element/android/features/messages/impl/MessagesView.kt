@@ -512,8 +512,11 @@ private fun MessagesViewComposerBottomSheetContents(
                 val verificationViolation = state.identityChangeState.roomMemberIdentityStateChanges.firstOrNull {
                     it.identityState == IdentityState.VerificationViolation
                 }
-                if (verificationViolation != null) {
-                    DisabledComposerView(modifier = Modifier.fillMaxWidth())
+                if (verificationViolation != null || state.composerState.isRestricted) {
+                    DisabledComposerView(
+                        state = state.composerState,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 } else {
                     MessageComposerView(
                         state = state.composerState,

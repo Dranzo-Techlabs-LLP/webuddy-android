@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.requiredHeightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,7 +40,12 @@ import io.element.android.libraries.designsystem.theme.components.IconColorButto
 @Composable
 internal fun DisabledComposerView(
     modifier: Modifier = Modifier,
+    state: MessageComposerState? = null,
 ) {
+    if (state?.isRestricted == true) {
+        RestrictedComposerView(modifier = modifier, state = state)
+        return
+    }
     Row(
         modifier = modifier
             .padding(3.dp)
@@ -80,6 +86,52 @@ internal fun DisabledComposerView(
                 contentDescription = "",
                 tint = ElementTheme.colors.iconQuaternary
             )
+        }
+    }
+}
+
+@Composable
+private fun RestrictedComposerView(
+    state: MessageComposerState,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(ElementTheme.colors.bgCanvasDefault)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(ElementTheme.colors.bgSubtlePrimary)
+                .border(1.dp, ElementTheme.colors.borderInteractiveSecondary, RoundedCornerShape(12.dp))
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = CompoundIcons.InfoSolid(),
+                contentDescription = null,
+                tint = ElementTheme.colors.iconPrimary,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Chat restricted. Please recharge your wallet to continue.",
+                    style = ElementTheme.typography.fontBodyMdMedium,
+                    color = ElementTheme.colors.textPrimary,
+                )
+                if (state.credits != null && state.maxCredits != null) {
+                    Text(
+                        text = "Current: ${state.credits} | Required: ${state.maxCredits}",
+                        style = ElementTheme.typography.fontBodySmRegular,
+                        color = ElementTheme.colors.textSecondary,
+                    )
+                }
+            }
         }
     }
 }

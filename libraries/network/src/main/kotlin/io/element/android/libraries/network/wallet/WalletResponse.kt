@@ -16,3 +16,8 @@ data class WalletResponse(
     @SerialName("max_credits") val maxCredits: String? = null,
     @SerialName("Webuddy_name") val webuddyName: String? = null,
 )
+
+@Serializable
+data class WalletUpdateRequest(
+    @SerialName("max_credits") val maxCredits: Int
+)

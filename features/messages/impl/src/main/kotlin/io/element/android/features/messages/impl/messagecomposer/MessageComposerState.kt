@@ -26,5 +26,9 @@ data class MessageComposerState(
     val suggestions: ImmutableList<ResolvedSuggestion>,
     val resolveMentionDisplay: (String, String) -> TextDisplay,
     val resolveAtRoomMentionDisplay: () -> TextDisplay,
+    val isRestricted: Boolean,
+    val isWalletLoaded: Boolean,
+    val credits: Int?,
+    val maxCredits: Int?,
     val eventSink: (MessageComposerEvent) -> Unit,
 )
