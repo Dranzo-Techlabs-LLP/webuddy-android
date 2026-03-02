@@ -114,6 +114,15 @@ class OnBoardingPresenter(
                         loginHint = params.loginHint?.takeIf { forcedAccountProvider == null },
                     )
                 }
+                OnBoardingEvents.OnCreateAccount -> localCoroutineScope.launch {
+                    val defaultUrl = OnBoardingConfig.DEFAULT_HOMESERVER_URL
+                    accountProviderDataSource.setUrl(defaultUrl)
+                    loginHelper.submit(
+                        isAccountCreation = true,
+                        homeserverUrl = defaultUrl,
+                        loginHint = null,
+                    )
+                }
                 OnBoardingEvents.ClearError -> loginHelper.clearError()
                 OnBoardingEvents.OnVersionClick -> {
                     if (canReportBug) {
@@ -131,7 +140,11 @@ class OnBoardingPresenter(
             defaultAccountProvider = defaultAccountProvider,
             mustChooseAccountProvider = mustChooseAccountProvider,
             canLoginWithQrCode = canLoginWithQrCode,
-            canCreateAccount = defaultAccountProvider == null && canConnectToAnyHomeserver && OnBoardingConfig.CAN_CREATE_ACCOUNT,
+            canCreateAccount = if (OnBoardingConfig.CAN_CREATE_ACCOUNT) {
+                defaultAccountProvider == null && canConnectToAnyHomeserver
+            } else {
+                false
+            },
             canReportBug = canReportBug && showReportBug,
             loginMode = loginMode,
             version = buildMeta.versionName,
