@@ -84,6 +84,7 @@ class DatabaseSessionStore(
                     lastUsageIndex = result.lastUsageIndex,
                     userDisplayName = result.userDisplayName,
                     userAvatarUrl = result.userAvatarUrl,
+                    webuddyName = result.webuddyName,
                 ).toDbModel()
             )
         }
@@ -104,6 +105,12 @@ class DatabaseSessionStore(
                     userAvatarUrl = avatarUrl,
                 ).toDbModel()
             )
+        }
+    }
+
+    override suspend fun updateWebuddyName(sessionId: String, webuddyName: String?) {
+        sessionDataMutex.withLock {
+            database.sessionDataQueries.updateWebuddyName(webuddyName, sessionId)
         }
     }
 

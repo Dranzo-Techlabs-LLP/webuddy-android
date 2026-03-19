@@ -1,0 +1,2 @@
+-- Add webuddyName to SessionData
+ALTER TABLE SessionData ADD COLUMN webuddyName TEXT;
