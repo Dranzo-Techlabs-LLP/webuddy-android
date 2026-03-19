@@ -29,10 +29,10 @@ class WalletService @Inject constructor(
     private val _maxCredits = MutableStateFlow<Int?>(null)
     val maxCredits: StateFlow<Int?> = _maxCredits.asStateFlow()
 
-    private val _originalMaxCredits = MutableStateFlow(0)
-    val originalMaxCredits: StateFlow<Int> = _originalMaxCredits.asStateFlow()
+    private val _originalMaxCredits = MutableStateFlow<Int?>(null)
+    val originalMaxCredits: StateFlow<Int?> = _originalMaxCredits.asStateFlow()
 
-    private val creditsCache = ConcurrentHashMap<String, Int>()
+    private val creditsCache = ConcurrentHashMap<String, Int?>()
 
     /**
      * Create a wallet user for the given Matrix userId.
@@ -71,29 +71,18 @@ class WalletService @Inject constructor(
 
             val maxCreditsValue = response.maxCredits?.let { 
                 it.jsonPrimitive.content.toDoubleOrNull()?.toInt() 
-            } ?: 0
+            } ?: 100
             _maxCredits.value = maxCreditsValue
             _originalMaxCredits.value = maxCreditsValue
 
-            response.webuddyName?.let {
-                creditsCache[userId] = maxCreditsValue
-            }
+            creditsCache[userId] = maxCreditsValue
         } catch (e: Exception) {
             Timber.e(e, "Failed to refresh wallet balance for user $userId")
-        }
-    }
-
-    fun setMaxCredits(amount: Int) {
-        _maxCredits.value = amount
-    }
-
-    suspend fun updateMaxCredits(userId: String, amount: Int) {
-        try {
-            walletApi.updateWallet(userId, WalletUpdateRequest(maxCredits = amount))
-            _originalMaxCredits.value = amount
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to update max credits for user $userId")
-            throw e
+            if (_credits.value == null) _credits.value = 0
+            if (_maxCredits.value == null) {
+                _maxCredits.value = 100
+                _originalMaxCredits.value = 100
+            }
         }
     }
 
@@ -110,11 +99,29 @@ class WalletService @Inject constructor(
             }
             if (maxCreditsValue != null) {
                 creditsCache[userId] = maxCreditsValue
+                _maxCredits.value = maxCreditsValue
+                _originalMaxCredits.value = maxCreditsValue
             }
             maxCreditsValue
         } catch (e: Exception) {
             Timber.e(e, "Failed to get max credits for user $userId. Error: ${e.message}")
             null
+        }
+    }
+
+    fun setMaxCredits(maxCredits: Int) {
+        _maxCredits.value = maxCredits
+    }
+
+    suspend fun updateMaxCredits(userId: String, maxCredits: Int) {
+        try {
+            walletApi.updateWallet(userId, WalletUpdateRequest(maxCredits = maxCredits))
+            _maxCredits.value = maxCredits
+            _originalMaxCredits.value = maxCredits
+            creditsCache[userId] = maxCredits
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to update max credits for user $userId")
+            throw e
         }
     }
 }
