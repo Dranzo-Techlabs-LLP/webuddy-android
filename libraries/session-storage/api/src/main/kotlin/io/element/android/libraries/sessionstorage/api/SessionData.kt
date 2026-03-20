@@ -46,4 +46,6 @@ data class SessionData(
     val userDisplayName: String?,
     /** The optional avatar URL of the user. */
     val userAvatarUrl: String?,
+    /** The webuddy name returned by the Wallet API. */
+    val webuddyName: String? = null,
 )

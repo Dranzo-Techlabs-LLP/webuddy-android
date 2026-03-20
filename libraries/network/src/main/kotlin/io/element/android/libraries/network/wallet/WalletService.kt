@@ -10,15 +10,18 @@ package io.element.android.libraries.network.wallet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.AppScope
+import io.element.android.libraries.sessionstorage.api.SessionStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.serialization.json.jsonPrimitive
 import timber.log.Timber
 import java.util.concurrent.ConcurrentHashMap
 
 @SingleIn(AppScope::class)
 class WalletService @Inject constructor(
-    private val walletApi: WalletApi
+    private val walletApi: WalletApi,
+    private val sessionStore: SessionStore,
 ) {
     private val _credits = MutableStateFlow<Int?>(null)
     val credits: StateFlow<Int?> = _credits.asStateFlow()
@@ -31,18 +34,47 @@ class WalletService @Inject constructor(
 
     private val creditsCache = ConcurrentHashMap<String, Int?>()
 
+    /**
+     * Create a wallet user for the given Matrix userId.
+     */
+    //@Suppress("unused", "SpellCheckingInspection")
+    suspend fun createUser(userId: String): Result<WalletResponse> {
+        return try {
+            val request = WalletCreateRequest(
+                name = userId,
+                webuddyName = userId,
+            )
+            val response = walletApi.createUser(request)
+            Timber.d("Wallet user created successfully for $userId")
+            
+            // On success, update local database
+            response.webuddyName?.let { webuddyName ->
+                sessionStore.updateWebuddyName(userId, webuddyName)
+            }
+            
+            Result.success(response)
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to create wallet user for $userId")
+            Result.failure(e)
+        }
+    }
+
     suspend fun refreshBalance(userId: String) {
         try {
             Timber.d("Refreshing balance for user: $userId")
             val response = walletApi.getWalletBalance(userId)
             
-            val balance = response.currentHold.toDoubleOrNull()?.toInt() ?: 0
+            val balance = response.currentHold?.let { 
+                it.jsonPrimitive.content.toDoubleOrNull()?.toInt() 
+            } ?: 0
             _credits.value = balance
-            
-            val maxCreditsValue = response.maxCredits?.toDoubleOrNull()?.toInt() ?: 100
+
+            val maxCreditsValue = response.maxCredits?.let { 
+                it.jsonPrimitive.content.toDoubleOrNull()?.toInt() 
+            } ?: 100
             _maxCredits.value = maxCreditsValue
             _originalMaxCredits.value = maxCreditsValue
-            
+
             creditsCache[userId] = maxCreditsValue
         } catch (e: Exception) {
             Timber.e(e, "Failed to refresh wallet balance for user $userId")
@@ -62,13 +94,15 @@ class WalletService @Inject constructor(
         return try {
             Timber.d("Fetching max credits from API for user: $userId")
             val response = walletApi.getWalletBalance(userId)
-            val maxCredits = response.maxCredits?.toDoubleOrNull()?.toInt()
-            if (maxCredits != null) {
-                creditsCache[userId] = maxCredits
-                _maxCredits.value = maxCredits
-                _originalMaxCredits.value = maxCredits
+            val maxCreditsValue = response.maxCredits?.let { 
+                it.jsonPrimitive.content.toDoubleOrNull()?.toInt() 
             }
-            maxCredits
+            if (maxCreditsValue != null) {
+                creditsCache[userId] = maxCreditsValue
+                _maxCredits.value = maxCreditsValue
+                _originalMaxCredits.value = maxCreditsValue
+            }
+            maxCreditsValue
         } catch (e: Exception) {
             Timber.e(e, "Failed to get max credits for user $userId. Error: ${e.message}")
             null

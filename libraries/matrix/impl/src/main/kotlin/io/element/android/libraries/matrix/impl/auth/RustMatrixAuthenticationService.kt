@@ -10,10 +10,12 @@ package io.element.android.libraries.matrix.impl.auth
 
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
+import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import io.element.android.libraries.core.coroutine.CoroutineDispatchers
 import io.element.android.libraries.core.extensions.mapFailure
 import io.element.android.libraries.core.extensions.runCatchingExceptions
+import io.element.android.libraries.di.annotations.AppCoroutineScope
 import io.element.android.libraries.matrix.api.MatrixClient
 import io.element.android.libraries.matrix.api.auth.AuthenticationException
 import io.element.android.libraries.matrix.api.auth.MatrixAuthenticationService
@@ -37,10 +39,13 @@ import io.element.android.libraries.matrix.impl.mapper.toSessionData
 import io.element.android.libraries.matrix.impl.paths.SessionPaths
 import io.element.android.libraries.matrix.impl.paths.SessionPathsFactory
 import io.element.android.libraries.matrix.impl.toSession
+import io.element.android.libraries.network.wallet.WalletService
 import io.element.android.libraries.sessionstorage.api.LoginType
 import io.element.android.libraries.sessionstorage.api.SessionStore
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.matrix.rustcomponents.sdk.Client
@@ -56,13 +61,15 @@ import kotlin.time.Duration.Companion.seconds
 
 @ContributesBinding(AppScope::class)
 @SingleIn(AppScope::class)
-class RustMatrixAuthenticationService(
+class RustMatrixAuthenticationService @Inject constructor(
     private val sessionPathsFactory: SessionPathsFactory,
     private val coroutineDispatchers: CoroutineDispatchers,
     private val sessionStore: SessionStore,
     private val rustMatrixClientFactory: RustMatrixClientFactory,
     private val passphraseGenerator: PassphraseGenerator,
     private val oidcConfigurationProvider: OidcConfigurationProvider,
+    private val walletService: WalletService,
+    @AppCoroutineScope private val appCoroutineScope: CoroutineScope,
 ) : MatrixAuthenticationService {
     // Passphrase which will be used for new sessions. Existing sessions will use the passphrase
     // stored in the SessionData.
@@ -156,6 +163,10 @@ class RustMatrixAuthenticationService(
                 currentClient = null
 
                 SessionId(sessionData.userId)
+            }.onSuccess { sessionId ->
+                appCoroutineScope.launch {
+                    handleWalletUserCreation(sessionId.value)
+                }
             }.mapFailure { failure ->
                 Timber.e(failure, "Failed to login")
                 failure.mapAuthenticationException()
@@ -189,6 +200,10 @@ class RustMatrixAuthenticationService(
                 currentClient = null
 
                 SessionId(sessionData.userId)
+            }.onSuccess { sessionId ->
+                appCoroutineScope.launch {
+                    handleWalletUserCreation(sessionId.value)
+                }
             }
         }
 
@@ -265,6 +280,10 @@ class RustMatrixAuthenticationService(
                 currentClient = null
 
                 SessionId(sessionData.userId)
+            }.onSuccess { sessionId ->
+                appCoroutineScope.launch {
+                    handleWalletUserCreation(sessionId.value)
+                }
             }.mapFailure { failure ->
                 Timber.e(failure, "Failed to login with OIDC")
                 failure.mapAuthenticationException()
@@ -328,6 +347,10 @@ class RustMatrixAuthenticationService(
                 currentClient = null
 
                 SessionId(sessionData.userId)
+            }.onSuccess { sessionId ->
+                appCoroutineScope.launch {
+                    handleWalletUserCreation(sessionId.value)
+                }
             }.mapFailure {
                 when (it) {
                     is QrCodeDecodeException -> QrErrorMapper.map(it)
@@ -383,5 +406,17 @@ class RustMatrixAuthenticationService(
             val status = sessionVerificationService.sessionVerifiedStatus.first { it != SessionVerifiedStatus.Unknown }
             Timber.d("Finished waiting for a known verification status: $status")
         } ?: Timber.w("Timed out waiting for a known verification status")
+    }
+
+    private suspend fun handleWalletUserCreation(userId: String) {
+        val session = sessionStore.getSession(userId)
+        if (session != null && session.webuddyName == null) {
+            walletService.createUser(userId = userId)
+                .onSuccess { response ->
+                    response.webuddyName?.let { webuddyName ->
+                        sessionStore.updateWebuddyName(userId, webuddyName)
+                    }
+                }
+        }
     }
 }

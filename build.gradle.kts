@@ -26,8 +26,18 @@ plugins {
     alias(libs.plugins.sonarqube)
 }
 
-tasks.register<Delete>("clean").configure {
+tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
+}
+
+subprojects {
+    afterEvaluate {
+        if (tasks.findByName("clean") == null) {
+            tasks.register<Delete>("clean") {
+                delete(layout.buildDirectory)
+            }
+        }
+    }
 }
 
 private val ktLintVersion = the<LibrariesForLibs>().versions.ktlint.get()
@@ -199,7 +209,7 @@ subprojects {
 // Make sure to delete old snapshot before recording new ones
 subprojects {
     val screenshotsDir = File("${project.projectDir}/screenshots")
-    val removeOldScreenshotsTask = tasks.register("removeOldScreenshots") {
+    val removeOldScreenshotsTask = tasks.register("removeOldScreenshotsRoborazzi") {
         onlyIf { screenshotsDir.exists() }
         doFirst {
             println("Delete previous screenshots located at $screenshotsDir\n")

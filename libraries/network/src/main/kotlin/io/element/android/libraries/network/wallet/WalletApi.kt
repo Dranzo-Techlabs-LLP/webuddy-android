@@ -14,12 +14,17 @@ import retrofit2.http.POST
 import retrofit2.http.Path
 
 interface WalletApi {
-    @GET("v1/users/{userId}")
+    @POST("v1/users/")
+    suspend fun createUser(
+        @Body request: WalletCreateRequest
+    ): WalletResponse
+
+    @GET("v1/users/{userId}/")
     suspend fun getWalletBalance(
         @Path("userId", encoded = true) userId: String
     ): WalletResponse
 
-    @PATCH("v1/users/{userId}")
+    @PATCH("v1/users/{userId}/")
     suspend fun updateWallet(
         @Path("userId", encoded = true) userId: String,
         @Body request: WalletUpdateRequest
