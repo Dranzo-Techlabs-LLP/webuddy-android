@@ -23,4 +23,5 @@ sealed interface AdvancedSettingsEvents {
     data class SetMaxCredits(val maxCredits: Int) : AdvancedSettingsEvents
     object SaveMaxCredits : AdvancedSettingsEvents
     object ClearWalletActionError : AdvancedSettingsEvents
+    object ConfigureBankDetails : AdvancedSettingsEvents
 }

@@ -142,6 +142,7 @@ class AdvancedSettingsPresenter(
                 is AdvancedSettingsEvents.ClearWalletActionError -> {
                     walletAction.value = AsyncAction.Uninitialized
                 }
+                is AdvancedSettingsEvents.ConfigureBankDetails -> Unit
             }
         }
 

@@ -10,6 +10,7 @@ package io.element.android.libraries.network.wallet
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.PATCH
+import retrofit2.http.POST
 import retrofit2.http.Path
 
 interface WalletApi {
@@ -23,4 +24,9 @@ interface WalletApi {
         @Path("userId", encoded = true) userId: String,
         @Body request: WalletUpdateRequest
     ): WalletResponse
+
+    @POST("v1/experts/bank-details")
+    suspend fun postBankDetails(
+        @Body request: BankDetails
+    ): Unit
 }

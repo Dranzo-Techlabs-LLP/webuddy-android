@@ -90,4 +90,13 @@ class WalletService @Inject constructor(
             throw e
         }
     }
+
+    suspend fun saveBankDetails(bankDetails: BankDetails) {
+        try {
+            walletApi.postBankDetails(bankDetails)
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to save bank details")
+            throw e
+        }
+    }
 }
