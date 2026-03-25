@@ -25,7 +25,6 @@ import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TopAppBarDefaults
@@ -144,11 +143,6 @@ fun HomeTopBar(
                     onClick = onOpenSettings,
                 )
             },
-            actions = {
-                if (selectedNavigationItem == HomeNavigationBarItem.Chats) {
-                    PlusButton(onClick = { /* Placeholder: Handle Add */ })
-                }
-            },
             windowInsets = WindowInsets(left = 4.dp),
         )
         if (displayFilters) {
@@ -177,29 +171,6 @@ fun HomeTopBar(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun PlusButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier = modifier
-            .padding(end = 12.dp)
-            .size(32.dp)
-            .clip(CircleShape)
-            .background(ElementTheme.colors.bgActionPrimaryRest)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = Icons.Default.Add,
-            contentDescription = null,
-            modifier = Modifier.size(20.dp),
-            tint = Color.White
-        )
     }
 }
 
