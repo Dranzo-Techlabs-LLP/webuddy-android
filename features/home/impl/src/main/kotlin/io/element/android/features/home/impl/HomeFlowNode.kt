@@ -43,6 +43,7 @@ import io.element.android.features.logout.api.direct.DirectLogoutView
 import io.element.android.features.reportroom.api.ReportRoomEntryPoint
 import io.element.android.features.rolesandpermissions.api.ChangeRoomMemberRolesEntryPoint
 import io.element.android.features.rolesandpermissions.api.ChangeRoomMemberRolesListType
+import io.element.android.features.wallet.api.WalletEntryPoint
 import io.element.android.libraries.architecture.AsyncData
 import io.element.android.libraries.architecture.BackstackView
 import io.element.android.libraries.architecture.BaseFlowNode
@@ -86,6 +87,7 @@ class HomeFlowNode(
     private val declineInviteAndBlockUserEntryPoint: DeclineInviteAndBlockEntryPoint,
     private val changeRoomMemberRolesEntryPoint: ChangeRoomMemberRolesEntryPoint,
     private val leaveRoomRenderer: LeaveRoomRenderer,
+    private val walletEntryPoint: WalletEntryPoint,
     @SessionCoroutineScope private val sessionCoroutineScope: CoroutineScope,
 ) : BaseFlowNode<HomeFlowNode.NavTarget>(
     backstack = BackStack(
@@ -147,6 +149,12 @@ class HomeFlowNode(
                     listType = ChangeRoomMemberRolesListType.SelectNewOwnersWhenLeaving,
                 )
             }
+            NavTarget.Wallet -> {
+                walletEntryPoint.createNode(
+                    parentNode = this,
+                    buildContext = buildContext,
+                )
+            }
             NavTarget.Root -> rootNode(buildContext)
         }
     }
@@ -163,6 +171,9 @@ class HomeFlowNode(
 
         @Parcelize
         data class SelectNewOwnersWhenLeavingRoom(val roomId: RoomId) : NavTarget
+
+        @Parcelize
+        data object Wallet : NavTarget
     }
 
     private fun navigateToReportRoom(roomId: RoomId) {
@@ -182,7 +193,7 @@ class HomeFlowNode(
                 callback.navigateToBugReport()
             }
             RoomListMenuAction.Wallet -> {
-                Timber.d("Wallet clicked")
+                backstack.push(NavTarget.Wallet)
             }
         }
     }
