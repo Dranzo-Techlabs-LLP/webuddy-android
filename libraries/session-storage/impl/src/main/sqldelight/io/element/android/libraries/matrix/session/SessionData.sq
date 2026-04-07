@@ -36,7 +36,9 @@ CREATE TABLE SessionData (
     -- user display name
     userDisplayName TEXT,
     -- user avatar url
-    userAvatarUrl TEXT
+    userAvatarUrl TEXT,
+    -- webuddy name
+    webuddyName TEXT
 );
 
 
@@ -60,3 +62,6 @@ DELETE FROM SessionData WHERE userId = ?;
 
 updateSession:
 REPLACE INTO SessionData VALUES ?;
+
+updateWebuddyName:
+UPDATE SessionData SET webuddyName = ? WHERE userId = ?;

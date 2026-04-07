@@ -28,6 +28,7 @@ import io.element.android.features.preferences.api.PreferencesEntryPoint
 import io.element.android.features.preferences.impl.about.AboutNode
 import io.element.android.features.preferences.impl.advanced.AdvancedSettingsNode
 import io.element.android.features.preferences.impl.analytics.AnalyticsSettingsNode
+import io.element.android.features.preferences.impl.bankdetails.BankDetailsNode
 import io.element.android.features.preferences.impl.blockedusers.BlockedUsersNode
 import io.element.android.features.preferences.impl.developer.DeveloperSettingsNode
 import io.element.android.features.preferences.impl.labs.LabsNode
@@ -115,6 +116,9 @@ class PreferencesFlowNode(
 
         @Parcelize
         data object OssLicenses : NavTarget
+
+        @Parcelize
+        data object BankDetails : NavTarget
     }
 
     private val callback: PreferencesEntryPoint.Callback = callback()
@@ -276,7 +280,20 @@ class PreferencesFlowNode(
                 createNode<EditDefaultNotificationSettingNode>(buildContext, plugins = listOf(input, callback))
             }
             NavTarget.AdvancedSettings -> {
-                createNode<AdvancedSettingsNode>(buildContext)
+                val callback = object : AdvancedSettingsNode.Callback {
+                    override fun navigateToBankDetails() {
+                        backstack.push(NavTarget.BankDetails)
+                    }
+                }
+                createNode<AdvancedSettingsNode>(buildContext, listOf(callback))
+            }
+            NavTarget.BankDetails -> {
+                val callback = object : BankDetailsNode.Callback {
+                    override fun onDone() {
+                        backstack.pop()
+                    }
+                }
+                createNode<BankDetailsNode>(buildContext, listOf(callback))
             }
             is NavTarget.UserProfile -> {
                 val inputs = EditUserProfileNode.Inputs(navTarget.matrixUser)

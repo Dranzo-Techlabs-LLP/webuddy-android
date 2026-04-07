@@ -41,6 +41,7 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import io.element.android.libraries.architecture.AsyncAction
 import im.vector.app.features.analytics.plan.Interaction
 import io.element.android.compound.theme.ElementTheme
+import io.element.android.compound.tokens.generated.CompoundIcons
 import io.element.android.features.preferences.impl.R
 import io.element.android.libraries.architecture.coverage.ExcludeFromCoverage
 import io.element.android.libraries.designsystem.components.dialogs.ListDialog
@@ -54,6 +55,7 @@ import io.element.android.libraries.designsystem.preview.ElementPreviewDark
 import io.element.android.libraries.designsystem.preview.ElementPreviewLight
 import io.element.android.libraries.designsystem.preview.PreviewWithLargeHeight
 import io.element.android.libraries.designsystem.preview.PreviewsDayNight
+import io.element.android.libraries.designsystem.theme.components.IconSource
 import io.element.android.libraries.designsystem.theme.components.ListItem
 import io.element.android.libraries.designsystem.theme.components.ListSectionHeader
 import io.element.android.libraries.designsystem.theme.components.ListSupportingText
@@ -75,6 +77,7 @@ import kotlinx.collections.immutable.toImmutableList
 fun AdvancedSettingsView(
     state: AdvancedSettingsState,
     onBackClick: () -> Unit,
+    onBankDetailsClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val analyticsService = LocalAnalyticsService.current
@@ -299,6 +302,18 @@ fun AdvancedSettingsView(
                     )
                 }
             }
+
+            ListItem(
+                headlineContent = {
+                    Text(
+                        text = "Bank Details",
+                        style = ElementTheme.typography.fontBodyLgMedium,
+                        color = ElementTheme.colors.textPrimary,
+                    )
+                },
+                leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Settings())),
+                onClick = onBankDetailsClick
+            )
         }
 
         ModerationAndSafety(state)
@@ -441,7 +456,8 @@ internal fun AdvancedSettingsViewDarkPreview(@PreviewParameter(AdvancedSettingsS
 private fun ContentToPreview(state: AdvancedSettingsState) {
     AdvancedSettingsView(
         state = state,
-        onBackClick = { }
+        onBackClick = { },
+        onBankDetailsClick = { },
     )
 }
 

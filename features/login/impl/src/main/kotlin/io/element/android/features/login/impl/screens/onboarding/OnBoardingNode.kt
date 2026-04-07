@@ -18,6 +18,7 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Assisted
 import dev.zacsweers.metro.AssistedInject
 import io.element.android.annotations.ContributesNode
+import io.element.android.appconfig.OnBoardingConfig
 import io.element.android.features.login.impl.util.openLearnMorePage
 import io.element.android.libraries.architecture.NodeInputs
 import io.element.android.libraries.architecture.callback
@@ -64,8 +65,8 @@ class OnBoardingNode(
         OnBoardingView(
             state = state,
             modifier = modifier,
-            onSignIn = callback::navigateToSignInFlow,
-            onCreateAccount = callback::navigateToSignUpFlow,
+            onSignIn = { state.eventSink(OnBoardingEvents.OnSignIn(OnBoardingConfig.DEFAULT_HOMESERVER_URL)) },
+            onCreateAccount = { state.eventSink(OnBoardingEvents.OnCreateAccount) },
             onSignInWithQrCode = callback::navigateToQrCode,
             onReportProblem = callback::navigateToBugReport,
             onOidcDetails = callback::navigateToOidc,

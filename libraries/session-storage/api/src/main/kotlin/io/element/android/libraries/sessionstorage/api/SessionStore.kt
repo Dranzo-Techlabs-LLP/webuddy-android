@@ -42,6 +42,11 @@ interface SessionStore {
     suspend fun updateUserProfile(sessionId: String, displayName: String?, avatarUrl: String?)
 
     /**
+     * Update the webuddy name of the session matching the userId.
+     */
+    suspend fun updateWebuddyName(sessionId: String, webuddyName: String?)
+
+    /**
      * Get the session data matching the userId, or null if not found.
      */
     suspend fun getSession(sessionId: String): SessionData?

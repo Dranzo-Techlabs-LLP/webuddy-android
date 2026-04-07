@@ -76,6 +76,7 @@ import io.element.android.libraries.textcomposer.model.MessageComposerMode
 import io.element.android.libraries.textcomposer.model.Suggestion
 import io.element.android.libraries.textcomposer.model.TextEditorState
 import io.element.android.libraries.textcomposer.model.rememberMarkdownTextEditorState
+import io.element.android.libraries.network.wallet.WalletService
 import io.element.android.services.analytics.api.AnalyticsService
 import io.element.android.services.analyticsproviders.api.trackers.captureInteraction
 import io.element.android.wysiwyg.compose.RichTextEditorState
@@ -96,6 +97,7 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Duration.Companion.seconds
 import io.element.android.libraries.core.mimetype.MimeTypes.Any as AnyMimeTypes
 
@@ -125,6 +127,7 @@ class MessageComposerPresenter(
     private val suggestionsProcessor: SuggestionsProcessor,
     private val mediaOptimizationConfigProvider: MediaOptimizationConfigProvider,
     private val notificationConversationService: NotificationConversationService,
+    private val walletService: WalletService,
 ) : Presenter<MessageComposerState> {
     @AssistedFactory
     interface Factory {
@@ -136,6 +139,7 @@ class MessageComposerPresenter(
     private val cameraPermissionPresenter = permissionsPresenterFactory.create(Manifest.permission.CAMERA)
     private var pendingEvent: MessageComposerEvent? = null
     private val suggestionSearchTrigger = MutableStateFlow<Suggestion?>(null)
+    private val recipientMaxCreditsState = MutableStateFlow<Int?>(null)
 
     // Used to disable some UI related elements in tests
     @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
@@ -149,7 +153,53 @@ class MessageComposerPresenter(
     override fun present(): MessageComposerState {
         val localCoroutineScope = rememberCoroutineScope()
 
+        val credits by walletService.credits.collectAsState()
+        val recipientMaxCredits by recipientMaxCreditsState.collectAsState()
         val roomInfo by room.roomInfoFlow.collectAsState()
+        val membersState by room.membersStateFlow.collectAsState()
+        val otherUserId = remember(roomInfo, membersState) { membersState.getDirectRoomMember(roomInfo, room.sessionId)?.userId?.value }
+
+        val isWalletLoaded = credits != null && recipientMaxCredits != null
+        val isRestricted = if (otherUserId == null) {
+            // Not a direct chat, no specific recipient to restrict against
+            false
+        } else if (!isWalletLoaded) {
+            // Default to restricted until we have verified both wallet balances
+            true
+        } else {
+            // Condition: Sender's current_hold < Receiver's max_credits
+            (credits ?: 0) < (recipientMaxCredits ?: 100)
+        }
+
+        LaunchedEffect(otherUserId) {
+            val myUserId = room.sessionId.value
+            walletService.refreshBalance(myUserId)
+            otherUserId?.let {
+                try {
+                    recipientMaxCreditsState.value = walletService.getMaxCredits(it)
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to fetch recipient wallet info")
+                }
+            }
+        }
+
+        LaunchedEffect(isRestricted, otherUserId) {
+            val myUserId = room.sessionId.value
+            // Continuously validate credits in real-time.
+            // When restricted, poll more frequently to quickly detect changes in either sender or receiver wallet.
+            val pollInterval = if (isRestricted) 5.seconds else 15.seconds
+            while (true) {
+                walletService.refreshBalance(myUserId)
+                otherUserId?.let {
+                    try {
+                        recipientMaxCreditsState.value = walletService.getMaxCredits(it)
+                    } catch (e: Exception) {
+                        Timber.e(e, "Failed to refresh recipient wallet info in loop")
+                    }
+                }
+                delay(pollInterval)
+            }
+        }
 
         val richTextEditorState = richTextEditorStateFactory.remember()
         if (isTesting) {
@@ -354,6 +404,20 @@ class MessageComposerPresenter(
                     val draft = createDraftFromState(markdownTextEditorState, richTextEditorState)
                     sessionCoroutineScope.updateDraft(draft, isVolatile = false)
                 }
+                MessageComposerEvent.RefreshWallet -> {
+                    sessionCoroutineScope.launch {
+                        val myUserId = room.sessionId.value
+                        val currentRoomInfo = room.info()
+                        val currentMembersState = room.membersStateFlow.value
+                        val currentOtherUserId = currentMembersState.getDirectRoomMember(currentRoomInfo, room.sessionId)?.userId?.value
+                        walletService.refreshBalance(myUserId)
+                        currentOtherUserId?.let {
+                            try {
+                                recipientMaxCreditsState.value = walletService.getMaxCredits(it)
+                            } catch (e: Exception) { /* ignore */ }
+                        }
+                    }
+                }
             }
         }
 
@@ -385,6 +449,10 @@ class MessageComposerPresenter(
             suggestions = suggestions.toImmutableList(),
             resolveMentionDisplay = resolveMentionDisplay,
             resolveAtRoomMentionDisplay = resolveAtRoomMentionDisplay,
+            isRestricted = isRestricted,
+            isWalletLoaded = isWalletLoaded,
+            credits = credits,
+            maxCredits = recipientMaxCredits,
             eventSink = ::handleEvent,
         )
     }
@@ -503,6 +571,20 @@ class MessageComposerPresenter(
                 messageType = Composer.MessageType.Text,
             )
         )
+
+        // Refresh wallet balance after sending a message to ensure real-time restriction
+        val myUserId = room.sessionId.value
+        val currentRoomInfo = room.info()
+        val currentMembersState = room.membersStateFlow.value
+        val currentOtherUserId = currentMembersState.getDirectRoomMember(currentRoomInfo, room.sessionId)?.userId?.value
+        walletService.refreshBalance(myUserId)
+        currentOtherUserId?.let {
+            sessionCoroutineScope.launch {
+                try {
+                    recipientMaxCreditsState.value = walletService.getMaxCredits(it)
+                } catch (e: Exception) { /* ignore */ }
+            }
+        }
     }
 
     private fun CoroutineScope.sendAttachment(
@@ -550,6 +632,17 @@ class MessageComposerPresenter(
             mediaOptimizationConfig = mediaOptimizationConfigProvider.get(),
             inReplyToEventId = inReplyToEventId,
         ).getOrThrow()
+        // Refresh wallet balance after sending media to ensure real-time restriction
+        val myUserId = room.sessionId.value
+        val currentRoomInfo = room.info()
+        val currentMembersState = room.membersStateFlow.value
+        val currentOtherUserId = currentMembersState.getDirectRoomMember(currentRoomInfo, room.sessionId)?.userId?.value
+        walletService.refreshBalance(myUserId)
+        currentOtherUserId?.let {
+            try {
+                recipientMaxCreditsState.value = walletService.getMaxCredits(it)
+            } catch (e: Exception) { /* ignore */ }
+        }
     }
         .onFailure { cause ->
             Timber.e(cause, "Failed to send attachment")
