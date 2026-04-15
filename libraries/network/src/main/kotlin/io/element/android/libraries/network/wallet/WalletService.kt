@@ -11,8 +11,11 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.AppScope
 import io.element.android.libraries.sessionstorage.api.SessionStore
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.jsonPrimitive
 import timber.log.Timber
@@ -33,6 +36,22 @@ class WalletService @Inject constructor(
     val originalMaxCredits: StateFlow<Int?> = _originalMaxCredits.asStateFlow()
 
     private val creditsCache = ConcurrentHashMap<String, Int?>()
+    private val orderToTransactionMap = ConcurrentHashMap<String, String>()
+
+    private val _paymentResults = MutableSharedFlow<WalletPaymentResult>(extraBufferCapacity = 1)
+    val paymentResults: SharedFlow<WalletPaymentResult> = _paymentResults.asSharedFlow()
+
+    suspend fun emitPaymentSuccess(orderId: String?, paymentId: String?, signature: String?) {
+        _paymentResults.emit(WalletPaymentResult.Success(orderId, paymentId, signature))
+    }
+
+    suspend fun emitPaymentError(code: Int, message: String?, orderId: String?) {
+        _paymentResults.emit(WalletPaymentResult.Error(code, message, orderId))
+    }
+
+    fun getTransactionIdForOrder(orderId: String): String? {
+        return orderToTransactionMap[orderId]
+    }
 
     /**
      * Create a wallet user for the given Matrix userId.
@@ -62,7 +81,9 @@ class WalletService @Inject constructor(
     suspend fun refreshBalance(userId: String) {
         try {
             Timber.d("Refreshing balance for user: $userId")
-            val response = walletApi.getWalletBalance(userId)
+            val sessionData = sessionStore.getSession(userId)
+            val identifier = sessionData?.webuddyName ?: userId
+            val response = walletApi.getWalletBalance(identifier)
             
             val balance = response.currentHold?.let { 
                 it.jsonPrimitive.content.toDoubleOrNull()?.toInt() 
@@ -93,7 +114,9 @@ class WalletService @Inject constructor(
         }
         return try {
             Timber.d("Fetching max credits from API for user: $userId")
-            val response = walletApi.getWalletBalance(userId)
+            val sessionData = sessionStore.getSession(userId)
+            val identifier = sessionData?.webuddyName ?: userId
+            val response = walletApi.getWalletBalance(identifier)
             val maxCreditsValue = response.maxCredits?.let { 
                 it.jsonPrimitive.content.toDoubleOrNull()?.toInt() 
             }
@@ -115,7 +138,9 @@ class WalletService @Inject constructor(
 
     suspend fun updateMaxCredits(userId: String, maxCredits: Int) {
         try {
-            walletApi.updateWallet(userId, WalletUpdateRequest(maxCredits = maxCredits))
+            val sessionData = sessionStore.getSession(userId)
+            val identifier = sessionData?.webuddyName ?: userId
+            walletApi.updateWallet(identifier, WalletUpdateRequest(maxCredits = maxCredits))
             _maxCredits.value = maxCredits
             _originalMaxCredits.value = maxCredits
             creditsCache[userId] = maxCredits
@@ -133,4 +158,72 @@ class WalletService @Inject constructor(
             throw e
         }
     }
+
+    suspend fun createOrder(userId: String, amount: Double): Result<CreateOrderResponse> {
+        return try {
+            val sessionData = sessionStore.getSession(userId)
+            val identifier = sessionData?.webuddyName ?: userId
+            val rechargeRequest = RechargeWalletRequest(
+                userId = identifier,
+                amount = amount
+            )
+            val response = walletApi.createOrder(rechargeRequest)
+            Timber.d("Order created successfully for $userId: ${response.orderId}")
+            
+            // Store mapping
+            orderToTransactionMap[response.orderId] = response.transactionId
+            
+            Result.success(response)
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to create order for $userId")
+            Result.failure(e)
+        }
+    }
+
+    suspend fun verifyPayment(
+        userId: String,
+        transactionId: String,
+        razorpayOrderId: String,
+        razorpayPaymentId: String,
+        razorpaySignature: String
+    ): Result<VerifyPaymentResponse> {
+        return try {
+            val sessionData = sessionStore.getSession(userId)
+            val identifier = sessionData?.webuddyName ?: userId
+            val request = VerifyPaymentRequest(
+                userId = identifier,
+                transactionId = transactionId,
+                razorpayOrderId = razorpayOrderId,
+                razorpayPaymentId = razorpayPaymentId,
+                razorpaySignature = razorpaySignature
+            )
+            val response = walletApi.verifyPayment(request)
+            Timber.d("Payment verified successfully: ${response.success}")
+            // Refresh balance after successful verification
+            if (response.success) {
+                refreshBalance(userId)
+            }
+            Result.success(response)
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to verify payment for $userId")
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getTransactionHistory(userId: String, page: Int = 1, pageSize: Int = 10): Result<TransactionHistoryResponse> {
+        return try {
+            val sessionData = sessionStore.getSession(userId)
+            val identifier = sessionData?.webuddyName ?: userId
+            val response = walletApi.getTransactionHistory(identifier, page, pageSize)
+            Result.success(response)
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to get transaction history for $userId")
+            Result.failure(e)
+        }
+    }
+}
+
+sealed class WalletPaymentResult {
+    data class Success(val orderId: String?, val paymentId: String?, val signature: String?) : WalletPaymentResult()
+    data class Error(val code: Int, val message: String?, val orderId: String?) : WalletPaymentResult()
 }

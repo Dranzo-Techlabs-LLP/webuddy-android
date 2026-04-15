@@ -73,3 +73,36 @@
 
 # Keep Metro classes
 -keep,allowshrinking class dev.zacsweers.metro.** { *; }
+
+# Razorpay
+-keepattributes SourceFile,LineNumberTable
+-keep class com.razorpay.** {*;}
+-dontwarn com.razorpay.**
+-keep class com.google.android.gms.wallet.** {*;}
+-keep class com.google.android.gms.common.api.** {*;}
+-keep class com.google.android.gms.common.internal.ReflectedParcelable {*;}
+-keep class com.google.android.gms.common.internal.safeparcel.SafeParcelable {*;}
+-keep class com.google.android.gms.common.util.PlatformVersion {*;}
+-keep class com.google.android.gms.tasks.** {*;}
+-keep class com.google.android.gms.auth.api.phone.SmsRetriever {*;}
+-keep class com.google.android.gms.auth.api.phone.SmsRetrieverClient {*;}
+-keep class com.google.android.gms.auth.api.credentials.Credential {*;}
+-keep class com.google.android.gms.auth.api.credentials.HintRequest {*;}
+-keep class com.google.android.gms.auth.api.credentials.CredentialPickerConfig {*;}
+-keep class com.google.android.gms.auth.api.credentials.Credentials {*;}
+-keep class com.google.android.gms.auth.api.credentials.CredentialsClient {*;}
+-keep class com.google.android.gms.auth.api.credentials.CredentialRequest {*;}
+-keep class com.google.android.gms.auth.api.credentials.CredentialRequestResponse {*;}
+-keep class com.google.android.gms.auth.api.credentials.IdentityProviders {*;}
+-keep class com.google.android.gms.auth.api.identity.GetSignInIntentRequest {*;}
+-keep class com.google.android.gms.auth.api.identity.Identity {*;}
+-keep class com.google.android.gms.auth.api.identity.SignInClient {*;}
+-keep class com.google.android.gms.auth.api.identity.SignInCredential {*;}
+-keep class com.google.android.gms.common.api.GoogleApiClient {*;}
+-keep class com.google.android.gms.common.api.PendingResult {*;}
+-keep class com.google.android.gms.common.api.Status {*;}
+-keep class com.google.android.gms.common.ConnectionResult {*;}
+-keep class com.google.android.gms.security.ProviderInstaller {*;}
+-keep class com.google.android.gms.security.ProviderInstaller$ProviderInstallListener {*;}
+-keep class org.apache.http.** {*;}
+-dontwarn org.apache.http.**

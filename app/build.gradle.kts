@@ -290,7 +290,9 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.startup)
     implementation(libs.androidx.preference)
+    implementation(libs.androidx.webkit)
     implementation(libs.coil)
+    implementation(libs.razorpay.checkout)
 
     implementation(platform(libs.network.okhttp.bom))
     implementation(libs.network.okhttp.logging)
@@ -329,6 +331,7 @@ licensee {
     ignoreDependencies("com.github.matrix-org", "matrix-analytics-events")
     // Ignore dependency that are not third-party licenses to us.
     ignoreDependencies(groupId = "io.element.android")
+    ignoreDependencies(groupId = "com.razorpay")
 }
 
 fun Project.configureLicensesTasks(reportingExtension: ReportingExtension) {

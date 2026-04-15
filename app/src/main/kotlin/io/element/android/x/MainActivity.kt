@@ -29,6 +29,9 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.bumble.appyx.core.integration.NodeHost
 import com.bumble.appyx.core.integrationpoint.NodeActivity
 import com.bumble.appyx.core.plugin.NodeReadyObserver
+import com.razorpay.Checkout
+import com.razorpay.PaymentData
+import com.razorpay.PaymentResultWithDataListener
 import io.element.android.compound.colors.SemanticColorsLightDark
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.features.lockscreen.api.LockScreenEntryPoint
@@ -39,6 +42,7 @@ import io.element.android.libraries.architecture.bindings
 import io.element.android.libraries.core.log.logger.LoggerTag
 import io.element.android.libraries.designsystem.theme.ElementThemeApp
 import io.element.android.libraries.designsystem.utils.snackbar.LocalSnackbarDispatcher
+import io.element.android.libraries.network.wallet.WalletService
 import io.element.android.services.analytics.compose.LocalAnalyticsService
 import io.element.android.x.di.AppBindings
 import io.element.android.x.intent.SafeUriHandler
@@ -47,15 +51,18 @@ import timber.log.Timber
 
 private val loggerTag = LoggerTag("MainActivity")
 
-class MainActivity : NodeActivity() {
+class MainActivity : NodeActivity(), PaymentResultWithDataListener {
     private lateinit var mainNode: MainNode
     private lateinit var appBindings: AppBindings
+    private lateinit var walletService: WalletService
 
     override fun onCreate(savedInstanceState: Bundle?) {
         Timber.tag(loggerTag.value).w("onCreate, with savedInstanceState: ${savedInstanceState != null}")
         installSplashScreen()
+        Checkout.preload(applicationContext)
         super.onCreate(savedInstanceState)
         appBindings = bindings()
+        walletService = appBindings.walletService()
         setupLockManagement(appBindings.lockScreenService(), appBindings.lockScreenEntryPoint())
         enableEdgeToEdge()
         setContent {
@@ -150,6 +157,29 @@ class MainActivity : NodeActivity() {
             mainNode.handleIntent(intent)
         } else {
             setIntent(intent)
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        Checkout.handleActivityResult(this, requestCode, resultCode, data, this, null)
+    }
+
+    override fun onPaymentSuccess(razorpayPaymentId: String?, paymentData: PaymentData?) {
+        Timber.tag(loggerTag.value).d("onPaymentSuccess: $razorpayPaymentId")
+        lifecycleScope.launch {
+            walletService.emitPaymentSuccess(
+                orderId = paymentData?.orderId,
+                paymentId = razorpayPaymentId,
+                signature = paymentData?.signature
+            )
+        }
+    }
+
+    override fun onPaymentError(code: Int, message: String?, paymentData: PaymentData?) {
+        Timber.tag(loggerTag.value).e("onPaymentError: code=$code, message=$message")
+        lifecycleScope.launch {
+            walletService.emitPaymentError(code, message, paymentData?.orderId)
         }
     }
 

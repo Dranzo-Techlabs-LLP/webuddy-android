@@ -60,7 +60,7 @@ dependencies {
     implementation(projects.features.reportroom.api)
     implementation(projects.features.rolesandpermissions.api)
     implementation(projects.libraries.previewutils)
-    implementation(projects.features.wallet)
+    implementation(projects.features.wallet.api)
     api(projects.features.home.api)
 
     testCommonDependencies(libs, true)

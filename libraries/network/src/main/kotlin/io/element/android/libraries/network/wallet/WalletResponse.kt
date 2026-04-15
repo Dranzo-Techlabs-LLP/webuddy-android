@@ -28,3 +28,59 @@ data class WalletCreateRequest(
 data class WalletUpdateRequest(
     @SerialName("max_credits") val maxCredits: Int
 )
+
+@Serializable
+data class RechargeWalletRequest(
+    @SerialName("userId") val userId: String,
+    @SerialName("amount") val amount: Double,
+)
+
+@Serializable
+data class CreateOrderResponse(
+    @SerialName("keyId") val keyId: String,
+    @SerialName("orderId") val orderId: String,
+    @SerialName("amountInPaise") val amountInPaise: Long,
+    @SerialName("currency") val currency: String,
+    @SerialName("transactionId") val transactionId: String,
+)
+
+@Serializable
+data class VerifyPaymentRequest(
+    @SerialName("userId") val userId: String,
+    @SerialName("transactionId") val transactionId: String,
+    @SerialName("razorpay_order_id") val razorpayOrderId: String,
+    @SerialName("razorpay_payment_id") val razorpayPaymentId: String,
+    @SerialName("razorpay_signature") val razorpaySignature: String,
+)
+
+@Serializable
+data class VerifyPaymentResponse(
+    @SerialName("success") val success: Boolean,
+    @SerialName("newBalance") val newBalance: Double,
+    @SerialName("transactionId") val transactionId: String,
+)
+
+@Serializable
+data class Transaction(
+    @SerialName("id") val id: String? = null,
+    @SerialName("userId") val userId: String,
+    @SerialName("amount") val amount: Double,
+    @SerialName("type") val type: String,
+    @SerialName("status") val status: String,
+    @SerialName("metaData") val metaData: JsonElement? = null,
+    @SerialName("createdAt") val createdAt: String? = null,
+)
+
+@Serializable
+data class TransactionHistoryResponse(
+    @SerialName("data") val data: List<Transaction>,
+    @SerialName("meta") val meta: TransactionHistoryMeta,
+)
+
+@Serializable
+data class TransactionHistoryMeta(
+    @SerialName("total") val total: Int,
+    @SerialName("page") val page: Int,
+    @SerialName("pageSize") val pageSize: Int,
+    @SerialName("totalPages") val totalPages: Int,
+)

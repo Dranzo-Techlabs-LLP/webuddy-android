@@ -65,7 +65,7 @@ class OnBoardingNode(
         OnBoardingView(
             state = state,
             modifier = modifier,
-            onSignIn = { state.eventSink(OnBoardingEvents.OnSignIn(OnBoardingConfig.DEFAULT_HOMESERVER_URL)) },
+            onSignIn = callback::navigateToSignInFlow,
             onCreateAccount = { state.eventSink(OnBoardingEvents.OnCreateAccount) },
             onSignInWithQrCode = callback::navigateToQrCode,
             onReportProblem = callback::navigateToBugReport,

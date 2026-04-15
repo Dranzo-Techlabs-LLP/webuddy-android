@@ -27,12 +27,32 @@ android {
                 name = "google_app_id",
                 value = BuildTimeConfig.GOOGLE_APP_ID_RELEASE,
             )
+            resValue(
+                type = "string",
+                name = "project_id",
+                value = "vector-alpha",
+            )
+            resValue(
+                type = "string",
+                name = "google_api_key",
+                value = "AIzaSyAFZX8IhIfgzdOZvxDP_ISO5WYoU7jmQ5c",
+            )
         }
         getByName("debug") {
             resValue(
                 type = "string",
                 name = "google_app_id",
                 value = BuildTimeConfig.GOOGLE_APP_ID_DEBUG,
+            )
+            resValue(
+                type = "string",
+                name = "project_id",
+                value = "vector-alpha",
+            )
+            resValue(
+                type = "string",
+                name = "google_api_key",
+                value = "AIzaSyAFZX8IhIfgzdOZvxDP_ISO5WYoU7jmQ5c",
             )
         }
         register("nightly") {
@@ -42,6 +62,16 @@ android {
                 type = "string",
                 name = "google_app_id",
                 value = BuildTimeConfig.GOOGLE_APP_ID_NIGHTLY,
+            )
+            resValue(
+                type = "string",
+                name = "project_id",
+                value = "vector-alpha",
+            )
+            resValue(
+                type = "string",
+                name = "google_api_key",
+                value = "AIzaSyAFZX8IhIfgzdOZvxDP_ISO5WYoU7jmQ5c",
             )
         }
     }
@@ -69,6 +99,7 @@ dependencies {
         exclude(group = "com.google.firebase", module = "firebase-analytics")
         exclude(group = "com.google.firebase", module = "firebase-measurement-connector")
     }
+    api(libs.google.firebase.installations)
 
     testCommonDependencies(libs)
     testImplementation(libs.kotlinx.collections.immutable)
