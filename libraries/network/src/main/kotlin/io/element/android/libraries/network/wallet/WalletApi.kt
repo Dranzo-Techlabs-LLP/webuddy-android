@@ -57,4 +57,10 @@ interface WalletApi {
     suspend fun initiateHold(
         @Body request: InitiateHoldRequest
     ): Unit
+
+    @GET("v1/pending-holds/exists")
+    suspend fun checkHoldExists(
+        @Query("clientId") clientId: String,
+        @Query("consultantId") consultantId: String
+    ): HoldExistsResponse
 }

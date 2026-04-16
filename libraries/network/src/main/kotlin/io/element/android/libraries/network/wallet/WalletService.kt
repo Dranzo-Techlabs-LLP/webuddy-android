@@ -239,6 +239,22 @@ class WalletService @Inject constructor(
             Result.failure(e)
         }
     }
+
+    suspend fun checkHoldExists(clientId: String, consultantId: String): Boolean {
+        return try {
+            val clientData = sessionStore.getSession(clientId)
+            val consultantData = sessionStore.getSession(consultantId)
+            
+            val response = walletApi.checkHoldExists(
+                clientId = clientData?.webuddyName ?: clientId,
+                consultantId = consultantData?.webuddyName ?: consultantId
+            )
+            response.exists
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to check hold existence between $clientId and $consultantId")
+            false
+        }
+    }
 }
 
 sealed class WalletPaymentResult {

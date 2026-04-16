@@ -140,6 +140,7 @@ class MessageComposerPresenter(
     private var pendingEvent: MessageComposerEvent? = null
     private val suggestionSearchTrigger = MutableStateFlow<Suggestion?>(null)
     private val recipientMaxCreditsState = MutableStateFlow<Int?>(null)
+    private val holdExistsState = MutableStateFlow<Boolean?>(null)
 
     // Used to disable some UI related elements in tests
     @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
@@ -155,16 +156,20 @@ class MessageComposerPresenter(
 
         val credits by walletService.credits.collectAsState()
         val recipientMaxCredits by recipientMaxCreditsState.collectAsState()
+        val holdExists by holdExistsState.collectAsState()
         val roomInfo by room.roomInfoFlow.collectAsState()
         val membersState by room.membersStateFlow.collectAsState()
         val otherUserId = remember(roomInfo, membersState) { membersState.getDirectRoomMember(roomInfo, room.sessionId)?.userId?.value }
 
-        val isWalletLoaded = credits != null && recipientMaxCredits != null
+        val isWalletLoaded = credits != null && recipientMaxCredits != null && holdExists != null
         val isRestricted = if (otherUserId == null) {
             // Not a direct chat, no specific recipient to restrict against
             false
+        } else if (holdExists == true) {
+            // Active hold exists, chat is NOT restricted regardless of balance
+            false
         } else if (!isWalletLoaded) {
-            // Default to restricted until we have verified both wallet balances
+            // Default to restricted until we have verified all data
             true
         } else {
             // Condition: Sender's current_hold < Receiver's max_credits
@@ -176,6 +181,7 @@ class MessageComposerPresenter(
             walletService.refreshBalance(myUserId)
             otherUserId?.let {
                 try {
+                    holdExistsState.value = walletService.checkHoldExists(myUserId, it)
                     recipientMaxCreditsState.value = walletService.getMaxCredits(it)
                 } catch (e: Exception) {
                     Timber.e(e, "Failed to fetch recipient wallet info")
@@ -192,6 +198,7 @@ class MessageComposerPresenter(
                 walletService.refreshBalance(myUserId)
                 otherUserId?.let {
                     try {
+                        holdExistsState.value = walletService.checkHoldExists(myUserId, it)
                         recipientMaxCreditsState.value = walletService.getMaxCredits(it)
                     } catch (e: Exception) {
                         Timber.e(e, "Failed to refresh recipient wallet info in loop")
@@ -413,6 +420,7 @@ class MessageComposerPresenter(
                         walletService.refreshBalance(myUserId)
                         currentOtherUserId?.let {
                             try {
+                                holdExistsState.value = walletService.checkHoldExists(myUserId, it)
                                 recipientMaxCreditsState.value = walletService.getMaxCredits(it)
                             } catch (e: Exception) { /* ignore */ }
                         }
@@ -583,6 +591,7 @@ class MessageComposerPresenter(
         currentOtherUserId?.let {
             sessionCoroutineScope.launch {
                 try {
+                    holdExistsState.value = walletService.checkHoldExists(myUserId, it)
                     recipientMaxCreditsState.value = walletService.getMaxCredits(it)
                 } catch (e: Exception) { /* ignore */ }
             }
@@ -642,6 +651,7 @@ class MessageComposerPresenter(
         walletService.refreshBalance(myUserId)
         currentOtherUserId?.let {
             try {
+                holdExistsState.value = walletService.checkHoldExists(myUserId, it)
                 recipientMaxCreditsState.value = walletService.getMaxCredits(it)
             } catch (e: Exception) { /* ignore */ }
         }

@@ -85,3 +85,8 @@ data class InitiateHoldRequest(
     @SerialName("clientId") val clientId: String,
     @SerialName("consultantId") val consultantId: String,
 )
+
+@Serializable
+data class HoldExistsResponse(
+    @SerialName("exists") val exists: Boolean,
+)
