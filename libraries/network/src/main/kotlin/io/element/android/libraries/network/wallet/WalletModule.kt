@@ -20,7 +20,7 @@ object WalletModule {
     @Provides
     @SingleIn(AppScope::class)
     fun providesWalletApi(retrofitFactory: RetrofitFactory): WalletApi {
-        return retrofitFactory.create("http://10.0.2.2:3000/")
+        return retrofitFactory.create("https://wallet.dranzo.com/")
             .create(WalletApi::class.java)
     }
 }

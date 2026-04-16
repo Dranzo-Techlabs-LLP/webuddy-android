@@ -221,6 +221,24 @@ class WalletService @Inject constructor(
             Result.failure(e)
         }
     }
+
+    suspend fun initiateHold(clientId: String, consultantId: String): Result<Unit> {
+        return try {
+            val clientData = sessionStore.getSession(clientId)
+            val consultantData = sessionStore.getSession(consultantId)
+            
+            val request = InitiateHoldRequest(
+                clientId = clientData?.webuddyName ?: clientId,
+                consultantId = consultantData?.webuddyName ?: consultantId
+            )
+            walletApi.initiateHold(request)
+            Timber.d("Hold initiated successfully between $clientId and $consultantId")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to initiate hold between $clientId and $consultantId")
+            Result.failure(e)
+        }
+    }
 }
 
 sealed class WalletPaymentResult {

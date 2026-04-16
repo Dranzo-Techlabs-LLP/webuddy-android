@@ -22,10 +22,16 @@ import io.element.android.libraries.matrix.api.room.startDM
 import io.element.android.libraries.matrix.api.user.MatrixUser
 import io.element.android.services.analytics.api.AnalyticsService
 
+import io.element.android.libraries.network.wallet.WalletService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+
 @ContributesBinding(SessionScope::class)
 class DefaultStartDMAction(
     private val matrixClient: MatrixClient,
     private val analyticsService: AnalyticsService,
+    private val walletService: WalletService,
 ) : StartDMAction {
     override suspend fun execute(
         matrixUser: MatrixUser,
@@ -37,6 +43,13 @@ class DefaultStartDMAction(
             is StartDMResult.Success -> {
                 if (result.isNew) {
                     analyticsService.capture(CreatedRoom(isDM = true))
+                    // Initiate hold on wallet for the new chat
+                    CoroutineScope(Dispatchers.IO).launch {
+                        walletService.initiateHold(
+                            clientId = matrixClient.sessionId.value,
+                            consultantId = matrixUser.userId.value
+                        )
+                    }
                 }
                 actionState.value = AsyncAction.Success(result.roomId)
             }

@@ -551,6 +551,8 @@ class MessageComposerPresenter(
             }
         }
 
+        initiateHoldIfNeeded()
+
         val roomInfo = room.info()
         val roomMembers = room.membersStateFlow.value
 
@@ -784,6 +786,22 @@ class MessageComposerPresenter(
             // Give some time for the focus of the previous editor to be cleared
             delay(100)
             markdownTextEditorState.requestFocusAction()
+        }
+    }
+
+    private fun CoroutineScope.initiateHoldIfNeeded() {
+        launch {
+            val roomInfo = room.roomInfoFlow.value
+            if (roomInfo.isDm) {
+                val members = room.membersStateFlow.value
+                val otherUserId = members.getDirectRoomMember(roomInfo, room.sessionId)?.userId?.value
+                if (otherUserId != null) {
+                    walletService.initiateHold(
+                        clientId = room.sessionId.value,
+                        consultantId = otherUserId
+                    )
+                }
+            }
         }
     }
 

@@ -43,6 +43,7 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(projects.libraries.featureflag.api)
     implementation(projects.features.createroom.api)
+    implementation(projects.libraries.network)
     api(projects.features.startchat.api)
 
     testCommonDependencies(libs, true)

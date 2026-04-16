@@ -74,8 +74,14 @@ data class Transaction(
 @Serializable
 data class TransactionHistoryResponse(
     @SerialName("data") val data: List<Transaction>,
-    @SerialName("total") val total: Int,
+    @SerialName("total") val total: Int? = null,
     @SerialName("page") val page: Int,
     @SerialName("pageSize") val pageSize: Int,
     @SerialName("totalPages") val totalPages: Int,
+)
+
+@Serializable
+data class InitiateHoldRequest(
+    @SerialName("clientId") val clientId: String,
+    @SerialName("consultantId") val consultantId: String,
 )

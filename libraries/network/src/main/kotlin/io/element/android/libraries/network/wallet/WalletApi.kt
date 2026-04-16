@@ -52,4 +52,9 @@ interface WalletApi {
         @Query("page") page: Int,
         @Query("pageSize") pageSize: Int
     ): TransactionHistoryResponse
+
+    @POST("v1/pending-holds/initiate")
+    suspend fun initiateHold(
+        @Body request: InitiateHoldRequest
+    ): Unit
 }
