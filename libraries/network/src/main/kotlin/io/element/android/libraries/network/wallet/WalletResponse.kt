@@ -64,7 +64,7 @@ data class VerifyPaymentResponse(
 data class Transaction(
     @SerialName("id") val id: String? = null,
     @SerialName("userId") val userId: String,
-    @SerialName("amount") val amount: Double,
+    @SerialName("amount") val amount: String,
     @SerialName("type") val type: String,
     @SerialName("status") val status: String,
     @SerialName("metaData") val metaData: JsonElement? = null,
@@ -74,11 +74,6 @@ data class Transaction(
 @Serializable
 data class TransactionHistoryResponse(
     @SerialName("data") val data: List<Transaction>,
-    @SerialName("meta") val meta: TransactionHistoryMeta,
-)
-
-@Serializable
-data class TransactionHistoryMeta(
     @SerialName("total") val total: Int,
     @SerialName("page") val page: Int,
     @SerialName("pageSize") val pageSize: Int,
