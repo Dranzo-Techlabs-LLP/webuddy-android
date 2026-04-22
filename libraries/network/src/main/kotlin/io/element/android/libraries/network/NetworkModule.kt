@@ -16,6 +16,7 @@ import dev.zacsweers.metro.SingleIn
 import io.element.android.libraries.network.interceptors.DynamicHttpLoggingInterceptor
 import io.element.android.libraries.network.interceptors.FormattedJsonHttpLogger
 import io.element.android.libraries.network.interceptors.UserAgentInterceptor
+import io.element.android.libraries.network.ollama.OllamaApi
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import java.util.concurrent.TimeUnit
@@ -41,5 +42,11 @@ object NetworkModule {
     fun providesHttpLoggingInterceptor(): HttpLoggingInterceptor {
         val logger = FormattedJsonHttpLogger(HttpLoggingInterceptor.Level.BODY)
         return HttpLoggingInterceptor(logger)
+    }
+
+    @Provides
+    @SingleIn(AppScope::class)
+    fun providesOllamaApi(retrofitFactory: RetrofitFactory): OllamaApi {
+        return retrofitFactory.create("http://10.0.2.2:11434").create(OllamaApi::class.java)
     }
 }

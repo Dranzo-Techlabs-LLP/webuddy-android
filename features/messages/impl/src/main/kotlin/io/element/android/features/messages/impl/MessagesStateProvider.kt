@@ -133,6 +133,7 @@ fun aMessagesState(
     dmUserVerificationState: IdentityState? = null,
     roomMemberModerationState: RoomMemberModerationState = aRoomMemberModerationState(),
     successorRoom: SuccessorRoom? = null,
+    summary: AsyncData<String> = AsyncData.Uninitialized,
     eventSink: (MessagesEvents) -> Unit = {},
 ) = MessagesState(
     roomId = RoomId("!id:domain"),
@@ -161,6 +162,7 @@ fun aMessagesState(
     dmUserVerificationState = dmUserVerificationState,
     roomMemberModerationState = roomMemberModerationState,
     successorRoom = successorRoom,
+    summary = summary,
     eventSink = eventSink,
 )
 

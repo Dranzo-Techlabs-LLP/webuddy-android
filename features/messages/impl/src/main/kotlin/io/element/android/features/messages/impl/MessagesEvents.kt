@@ -20,6 +20,15 @@ sealed interface MessagesEvents {
     data class OnUserClicked(val user: MatrixUser) : MessagesEvents
     data object Dismiss : MessagesEvents
     data object MarkAsFullyReadAndExit : MessagesEvents
+    data class Summarize(val duration: SummaryDuration) : MessagesEvents
+    data class AskAI(val question: String) : MessagesEvents
+    data object DismissSummary : MessagesEvents
+}
+
+enum class SummaryDuration {
+    LastDay,
+    LastWeek,
+    LastMonth
 }
 
 enum class InviteDialogAction {

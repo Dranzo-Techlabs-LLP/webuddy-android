@@ -17,8 +17,13 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.tokens.generated.CompoundIcons
+import io.element.android.features.messages.impl.SummaryDuration
 import io.element.android.features.messages.impl.timeline.components.CallMenuItem
 import io.element.android.features.roomcall.api.RoomCallState
 import io.element.android.features.roomcall.api.aStandByCallState
@@ -66,8 +72,10 @@ internal fun MessagesViewTopBar(
     onRoomDetailsClick: () -> Unit,
     onJoinCallClick: () -> Unit,
     onBackClick: () -> Unit,
+    onSummarizeClick: (SummaryDuration?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var showSummaryMenu by remember { mutableStateOf(false) }
     TopAppBar(
         modifier = modifier,
         navigationIcon = {
@@ -111,6 +119,38 @@ internal fun MessagesViewTopBar(
             }
         },
         actions = {
+            IconButton(onClick = { showSummaryMenu = true }) {
+                Icon(
+                    imageVector = CompoundIcons.History(),
+                    contentDescription = "Summarize"
+                )
+            }
+            io.element.android.libraries.designsystem.theme.components.DropdownMenu(
+                expanded = showSummaryMenu,
+                onDismissRequest = { showSummaryMenu = false }
+            ) {
+                io.element.android.libraries.designsystem.theme.components.DropdownMenuItem(
+                    text = { Text("Summarize (24h)") },
+                    onClick = {
+                        showSummaryMenu = false
+                        onSummarizeClick(SummaryDuration.LastDay)
+                    }
+                )
+                io.element.android.libraries.designsystem.theme.components.DropdownMenuItem(
+                    text = { Text("Summarize (7d)") },
+                    onClick = {
+                        showSummaryMenu = false
+                        onSummarizeClick(SummaryDuration.LastWeek)
+                    }
+                )
+                io.element.android.libraries.designsystem.theme.components.DropdownMenuItem(
+                    text = { Text("Ask AI about chat") },
+                    onClick = {
+                        showSummaryMenu = false
+                        onSummarizeClick(null) // Signal Ask AI
+                    }
+                )
+            }
             CallMenuItem(
                 roomCallState = roomCallState,
                 onJoinCallClick = onJoinCallClick,
@@ -179,6 +219,7 @@ internal fun MessagesViewTopBarPreview() = ElementPreview {
         onRoomDetailsClick = {},
         onJoinCallClick = {},
         onBackClick = {},
+        onSummarizeClick = {},
     )
     Column {
         AMessagesViewTopBar()

@@ -123,6 +123,7 @@ class MessagesPresenter(
     private val featureFlagService: FeatureFlagService,
     private val addRecentEmoji: AddRecentEmoji,
     private val markAsFullyRead: MarkAsFullyRead,
+    private val ollamaApi: io.element.android.libraries.network.ollama.OllamaApi,
     @SessionCoroutineScope private val sessionCoroutineScope: CoroutineScope,
 ) : Presenter<MessagesState> {
     @AssistedFactory
@@ -172,7 +173,9 @@ class MessagesPresenter(
             derivedStateOf { roomInfo.avatarData() }
         }
         val heroes by remember {
-            derivedStateOf { roomInfo.heroes().toImmutableList() }
+            derivedStateOf {
+                roomInfo.heroes.map { it.getAvatarData(AvatarSize.TimelineRoom) }.toImmutableList()
+            }
         }
 
         var hasDismissedInviteDialog by rememberSaveable {
@@ -221,6 +224,56 @@ class MessagesPresenter(
             onPauseOrDispose {}
         }
 
+        val summary = remember { mutableStateOf<AsyncData<String>>(AsyncData.Uninitialized) }
+
+        fun handleSummarize(duration: SummaryDuration) {
+            localCoroutineScope.launch {
+                summary.value = AsyncData.Loading()
+                try {
+                    val messages = getChatHistory(duration, timelineState)
+
+                    if (messages.isBlank()) {
+                        summary.value = AsyncData.Success("No messages found in the selected period.")
+                        return@launch
+                    }
+
+                    val prompt = "Summarize the following chat transcript concisely:\n\n$messages"
+                    val response = ollamaApi.generate(
+                        io.element.android.libraries.network.ollama.OllamaGenerateRequest(
+                            model = "gemma4:e2b",
+                            prompt = prompt
+                        )
+                    )
+                    summary.value = AsyncData.Success(response.response)
+                } catch (e: Exception) {
+                    summary.value = AsyncData.Failure(e)
+                }
+            }
+        }
+
+        fun handleAskAI(question: String) {
+            if (question == "DUMMY_TRIGGER") {
+                summary.value = AsyncData.Success("ASK_AI_TRIGGER")
+                return
+            }
+            localCoroutineScope.launch {
+                summary.value = AsyncData.Loading()
+                try {
+                    val history = getChatHistory(SummaryDuration.LastMonth, timelineState)
+                    val prompt = "Context from chat history:\n$history\n\nQuestion: $question\n\nAnswer the question based on the context provided."
+                    val response = ollamaApi.generate(
+                        io.element.android.libraries.network.ollama.OllamaGenerateRequest(
+                            model = "gemma4:e2b",
+                            prompt = prompt
+                        )
+                    )
+                    summary.value = AsyncData.Success(response.response)
+                } catch (e: Exception) {
+                    summary.value = AsyncData.Failure(e)
+                }
+            }
+        }
+
         fun handleEvent(event: MessagesEvents) {
             when (event) {
                 is MessagesEvents.HandleAction -> {
@@ -263,6 +316,9 @@ class MessagesPresenter(
                         markingAsReadAndExiting.set(false)
                     }
                 }
+                is MessagesEvents.Summarize -> handleSummarize(event.duration)
+                is MessagesEvents.AskAI -> handleAskAI(event.question)
+                is MessagesEvents.DismissSummary -> summary.value = AsyncData.Uninitialized
             }
         }
 
@@ -293,6 +349,7 @@ class MessagesPresenter(
             dmUserVerificationState = dmUserVerificationState,
             roomMemberModerationState = roomMemberModerationState,
             successorRoom = roomInfo.successorRoom,
+            summary = summary.value,
             eventSink = ::handleEvent,
         )
     }
@@ -306,10 +363,22 @@ class MessagesPresenter(
         )
     }
 
-    private fun RoomInfo.heroes(): List<AvatarData> {
-        return heroes.map { user ->
-            user.getAvatarData(size = AvatarSize.TimelineRoom)
-        }
+    private fun getChatHistory(duration: SummaryDuration, timelineState: TimelineState): String {
+        return timelineState.timelineItems
+            .filterIsInstance<TimelineItem.Event>()
+            .filter { it.content is TimelineItemTextBasedContent }
+            .let { items ->
+                val now = System.currentTimeMillis()
+                val threshold = when (duration) {
+                    SummaryDuration.LastDay -> 24 * 60 * 60 * 1000L
+                    SummaryDuration.LastWeek -> 7 * 24 * 60 * 60 * 1000L
+                    SummaryDuration.LastMonth -> 30 * 24 * 60 * 60 * 1000L
+                }
+                items.filter { now - it.sentTimeMillis < threshold }
+            }
+            .take(100)
+            .reversed()
+            .joinToString("\n") { "${it.safeSenderName}: ${(it.content as TimelineItemTextBasedContent).plainText}" }
     }
 
     private fun CoroutineScope.handleTimelineAction(

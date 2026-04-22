@@ -32,6 +32,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import io.element.android.libraries.designsystem.components.dialogs.TextFieldDialog
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -88,9 +90,11 @@ import io.element.android.features.messages.impl.topbars.ThreadTopBar
 import io.element.android.features.messages.impl.voicemessages.composer.VoiceMessagePermissionRationaleDialog
 import io.element.android.features.messages.impl.voicemessages.composer.VoiceMessageSendingFailedDialog
 import io.element.android.libraries.androidutils.ui.hideKeyboard
+import io.element.android.libraries.architecture.AsyncData
 import io.element.android.libraries.designsystem.atomic.molecules.ComposerAlertMolecule
 import io.element.android.libraries.designsystem.components.ExpandableBottomSheetLayout
 import io.element.android.libraries.designsystem.components.ExpandableBottomSheetLayoutState
+import io.element.android.libraries.designsystem.components.dialogs.AlertDialog
 import io.element.android.libraries.designsystem.components.dialogs.ConfirmationDialog
 import io.element.android.libraries.designsystem.components.rememberExpandableBottomSheetLayoutState
 import io.element.android.libraries.designsystem.preview.ElementPreview
@@ -228,6 +232,13 @@ fun MessagesView(
                             onBackClick = { hidingKeyboard { onBackClick() } },
                             onRoomDetailsClick = { hidingKeyboard { onRoomDetailsClick() } },
                             onJoinCallClick = onJoinCallClick,
+                            onSummarizeClick = { duration ->
+            if (duration != null) {
+                state.eventSink(MessagesEvents.Summarize(duration))
+            } else {
+                state.eventSink(MessagesEvents.AskAI("DUMMY_TRIGGER"))
+            }
+        }
                         )
                     }
                 },
@@ -365,6 +376,7 @@ fun MessagesView(
         state = state.readReceiptBottomSheetState,
         onUserDataClick = onUserDataClick,
     )
+    SummaryDialog(state = state)
     ReinviteDialog(state = state)
     LinkView(
         onLinkValid = { link ->
@@ -372,6 +384,63 @@ fun MessagesView(
         },
         state = state.linkState,
     )
+}
+
+@Composable
+private fun SummaryDialog(state: MessagesState) {
+    val summary = state.summary
+    var showAskAIDialog by remember { mutableStateOf(false) }
+
+    when (summary) {
+        is AsyncData.Loading -> {
+            AlertDialog(
+                title = "Clariva AI is thinking...",
+                content = "Please wait while we process your request.",
+                onDismiss = { state.eventSink(MessagesEvents.DismissSummary) },
+                submitText = stringResource(CommonStrings.action_cancel)
+            )
+        }
+        is AsyncData.Success -> {
+            AlertDialog(
+                title = "AI Response",
+                content = summary.data,
+                onDismiss = { state.eventSink(MessagesEvents.DismissSummary) },
+            )
+        }
+        is AsyncData.Failure -> {
+            AlertDialog(
+                title = "AI Error",
+                content = "Could not get a response: ${summary.error.message}",
+                onDismiss = { state.eventSink(MessagesEvents.DismissSummary) },
+            )
+        }
+        AsyncData.Uninitialized -> Unit
+    }
+
+    // This is a hack to show the Ask AI dialog when the top bar menu is clicked
+    LaunchedEffect(state.summary) {
+        if (state.summary.dataOrNull() == "ASK_AI_TRIGGER") {
+            showAskAIDialog = true
+            state.eventSink(MessagesEvents.DismissSummary)
+        }
+    }
+
+    if (showAskAIDialog) {
+        var questionState by remember { mutableStateOf("") }
+        TextFieldDialog(
+            title = "Ask Clariva AI",
+            content = "Ask anything about the chat history (last 30 days).",
+            placeholder = "e.g. What was discussed about the project deadline?",
+            value = questionState,
+            onSubmit = {
+                state.eventSink(MessagesEvents.AskAI(it))
+                showAskAIDialog = false
+            },
+            onDismissRequest = {
+                showAskAIDialog = false
+            }
+        )
+    }
 }
 
 @Composable
