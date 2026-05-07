@@ -40,6 +40,7 @@ class WalletPresenter @Inject constructor(
     override fun present(): WalletState {
         val coroutineScope = rememberCoroutineScope()
         val credits by walletService.credits.collectAsState()
+        val isCurrentUserConsultant by walletService.isCurrentUserConsultant.collectAsState()
         val rechargeAction = remember { mutableStateOf<AsyncAction<CreateOrderResponse>>(AsyncAction.Uninitialized) }
 
         val transactionsState = remember { mutableStateOf<List<WalletTransaction>>(emptyList()) }
@@ -162,6 +163,7 @@ class WalletPresenter @Inject constructor(
             transactions = transactionsState.value,
             isLoadingTransactions = isLoadingTransactions.value,
             canLoadMoreTransactions = canLoadMore.value,
+            isConsultant = isCurrentUserConsultant == true,
             eventSink = ::handleEvent
         )
     }

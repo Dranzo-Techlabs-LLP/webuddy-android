@@ -157,6 +157,7 @@ class MessageComposerPresenter(
         val credits by walletService.credits.collectAsState()
         val recipientMaxCredits by recipientMaxCreditsState.collectAsState()
         val holdExists by holdExistsState.collectAsState()
+        val isCurrentUserConsultant by walletService.isCurrentUserConsultant.collectAsState()
         val roomInfo by room.roomInfoFlow.collectAsState()
         val membersState by room.membersStateFlow.collectAsState()
         val otherUserId = remember(roomInfo, membersState) { membersState.getDirectRoomMember(roomInfo, room.sessionId)?.userId?.value }
@@ -164,6 +165,9 @@ class MessageComposerPresenter(
         val isWalletLoaded = credits != null && recipientMaxCredits != null && holdExists != null
         val isRestricted = if (otherUserId == null) {
             // Not a direct chat, no specific recipient to restrict against
+            false
+        } else if (isCurrentUserConsultant == true) {
+            // Consultants are paid by clients; they're never blocked from replying.
             false
         } else if (holdExists == true) {
             // Active hold exists, chat is NOT restricted regardless of balance

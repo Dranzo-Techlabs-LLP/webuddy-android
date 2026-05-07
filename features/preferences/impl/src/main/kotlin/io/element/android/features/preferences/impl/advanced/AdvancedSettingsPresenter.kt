@@ -94,6 +94,7 @@ class AdvancedSettingsPresenter(
 
         val maxCredits by walletService.maxCredits.collectAsState()
         val originalMaxCredits by walletService.originalMaxCredits.collectAsState()
+        val isCurrentUserConsultant by walletService.isCurrentUserConsultant.collectAsState()
         val walletAction = remember { mutableStateOf<AsyncAction<Unit>>(AsyncAction.Uninitialized) }
 
         LaunchedEffect(Unit) {
@@ -155,6 +156,7 @@ class AdvancedSettingsPresenter(
             maxCredits = maxCredits,
             originalMaxCredits = originalMaxCredits,
             walletAction = walletAction.value,
+            isConsultant = isCurrentUserConsultant == true,
             eventSink = ::handleEvent,
         )
     }

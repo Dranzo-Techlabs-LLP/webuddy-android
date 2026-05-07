@@ -229,7 +229,7 @@ fun AdvancedSettingsView(
             }
         }
 
-        PreferenceCategory(
+        if (state.isConsultant) PreferenceCategory(
             title = stringResource(id = CommonStrings.common_wallet),
             showTopDivider = true,
         ) {

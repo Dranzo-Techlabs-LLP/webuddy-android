@@ -150,6 +150,7 @@ fun WalletView(
                 onLoadMore = { state.eventSink(WalletEvents.LoadMoreTransactions) },
                 credits = state.credits,
                 rechargeAction = state.rechargeAction,
+                showRechargeButton = !state.isConsultant,
                 onRechargeClick = { showRechargeDialog = true },
                 modifier = Modifier
                     .padding(padding)
@@ -167,6 +168,7 @@ fun TransactionList(
     onLoadMore: () -> Unit,
     credits: Int?,
     rechargeAction: AsyncAction<CreateOrderResponse>,
+    showRechargeButton: Boolean,
     onRechargeClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -207,16 +209,18 @@ fun TransactionList(
                 )
                 Spacer(modifier = Modifier.height(24.dp))
 
-                if (rechargeAction.isLoading()) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = "Processing recharge...")
-                } else {
-                    Button(
-                        text = "Recharge Credits",
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = onRechargeClick
-                    )
+                if (showRechargeButton) {
+                    if (rechargeAction.isLoading()) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(text = "Processing recharge...")
+                    } else {
+                        Button(
+                            text = "Recharge Credits",
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = onRechargeClick
+                        )
+                    }
                 }
 
                 if (rechargeAction is AsyncAction.Failure) {

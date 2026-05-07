@@ -25,6 +25,8 @@ data class AdvancedSettingsState(
     val maxCredits: Int?,
     val originalMaxCredits: Int?,
     val walletAction: AsyncAction<Unit>,
+    /** True when the logged-in user is a consultant. Wallet section (Max Credits, Bank Details) only shows for consultants. */
+    val isConsultant: Boolean,
     val eventSink: (AdvancedSettingsEvents) -> Unit
 )
 

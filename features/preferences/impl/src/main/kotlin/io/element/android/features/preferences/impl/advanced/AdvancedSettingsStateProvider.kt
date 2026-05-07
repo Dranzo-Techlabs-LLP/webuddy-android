@@ -43,6 +43,7 @@ fun aAdvancedSettingsState(
     maxCredits: Int? = 100,
     originalMaxCredits: Int? = 100,
     walletAction: AsyncAction<Unit> = AsyncAction.Uninitialized,
+    isConsultant: Boolean = true,
     eventSink: (AdvancedSettingsEvents) -> Unit = {},
 ) = AdvancedSettingsState(
     isDeveloperModeEnabled = isDeveloperModeEnabled,
@@ -52,6 +53,7 @@ fun aAdvancedSettingsState(
     maxCredits = maxCredits,
     originalMaxCredits = originalMaxCredits,
     walletAction = walletAction,
+    isConsultant = isConsultant,
     mediaPreviewConfigState = MediaPreviewConfigState(
         hideInviteAvatars = hideInviteAvatars,
         timelineMediaPreviewValue = timelineMediaPreviewValue,

@@ -18,5 +18,7 @@ data class WalletState(
     val transactions: List<WalletTransaction> = emptyList(),
     val isLoadingTransactions: Boolean = false,
     val canLoadMoreTransactions: Boolean = false,
+    /** Recharge button is hidden when the user is a consultant (consultants receive credits, they don't buy them). */
+    val isConsultant: Boolean = false,
     val eventSink: (WalletEvents) -> Unit
 )
