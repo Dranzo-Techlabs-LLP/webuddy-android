@@ -76,7 +76,10 @@ internal fun MessagesViewTopBar(
     isRefundButtonVisible: Boolean,
     refundStatus: String?,
     isRefundRequestInProgress: Boolean,
+    isConsultantInThisRoom: Boolean,
     onRefundClick: () -> Unit,
+    onApproveRefundClick: () -> Unit,
+    onRejectRefundClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     TopAppBar(
@@ -122,7 +125,61 @@ internal fun MessagesViewTopBar(
             }
         },
         actions = {
-            if (isRefundButtonVisible && (refundStatus == "none" || refundStatus == null)) {
+            // Consultant view: incoming refund request awaiting decision.
+            if (isRefundButtonVisible && isConsultantInThisRoom && refundStatus == "requested") {
+                val showApproveConfirm = remember { mutableStateOf(false) }
+                val showRejectConfirm = remember { mutableStateOf(false) }
+                val tint = if (!isRefundRequestInProgress) ElementTheme.colors.iconPrimary else ElementTheme.colors.iconDisabled
+
+                IconButton(
+                    onClick = { showApproveConfirm.value = true },
+                    enabled = !isRefundRequestInProgress
+                ) {
+                    Icon(
+                        imageVector = CompoundIcons.Check(),
+                        contentDescription = "Approve Refund",
+                        tint = tint,
+                    )
+                }
+                IconButton(
+                    onClick = { showRejectConfirm.value = true },
+                    enabled = !isRefundRequestInProgress
+                ) {
+                    Icon(
+                        imageVector = CompoundIcons.Close(),
+                        contentDescription = "Reject Refund",
+                        tint = tint,
+                    )
+                }
+
+                if (showApproveConfirm.value) {
+                    io.element.android.libraries.designsystem.components.dialogs.ConfirmationDialog(
+                        title = "Approve Refund",
+                        content = "The held amount will be returned to the client immediately.",
+                        submitText = "Approve",
+                        cancelText = "Cancel",
+                        onSubmitClick = {
+                            showApproveConfirm.value = false
+                            onApproveRefundClick()
+                        },
+                        onDismiss = { showApproveConfirm.value = false }
+                    )
+                }
+                if (showRejectConfirm.value) {
+                    io.element.android.libraries.designsystem.components.dialogs.ConfirmationDialog(
+                        title = "Reject Refund",
+                        content = "The held amount will transfer to your wallet at the end of the hold window.",
+                        submitText = "Reject",
+                        cancelText = "Cancel",
+                        onSubmitClick = {
+                            showRejectConfirm.value = false
+                            onRejectRefundClick()
+                        },
+                        onDismiss = { showRejectConfirm.value = false }
+                    )
+                }
+            } else if (isRefundButtonVisible && !isConsultantInThisRoom && (refundStatus == "none" || refundStatus == null)) {
+                // Client view: can request refund.
                 val showRefundConfirm = remember { mutableStateOf(false) }
 
                 IconButton(
@@ -227,7 +284,10 @@ internal fun MessagesViewTopBarPreview() = ElementPreview {
         isRefundButtonVisible = false,
         refundStatus = null,
         isRefundRequestInProgress = false,
+        isConsultantInThisRoom = false,
         onRefundClick = {},
+        onApproveRefundClick = {},
+        onRejectRefundClick = {},
         onRoomDetailsClick = {},
         onJoinCallClick = {},
         onBackClick = {},

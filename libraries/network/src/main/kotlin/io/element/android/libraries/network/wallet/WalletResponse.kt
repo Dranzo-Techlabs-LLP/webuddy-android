@@ -97,11 +97,15 @@ data class HoldExistsResponse(
 
 @Serializable
 data class PendingHoldStatusResponse(
+    @SerialName("exists") val exists: Boolean = false,
     @SerialName("isActive") val isActive: Int = 1,         // DB: tinyint(1), 1=active 0=inactive
     @SerialName("isRefundActive") val isRefundActive: Int = 1, // DB: tinyint, 1=refund active 0=closed
     @SerialName("refund_status") val refundStatus: String = "none", // DB enum: 'none','requested','approved','rejected'
     @SerialName("pendingHoldId") val pendingHoldId: JsonElement? = null, // API-level field, not a DB column
-    @SerialName("id") val id: JsonElement? = null // Fallback to DB-level id field
+    @SerialName("id") val id: JsonElement? = null, // Fallback to DB-level id field
+    @SerialName("clientId") val clientId: String? = null,
+    @SerialName("consultantId") val consultantId: String? = null,
+    @SerialName("refundRequestId") val refundRequestId: JsonElement? = null,
 ) {
     val holdIdString: String? get() {
         val element = pendingHoldId ?: id ?: return null
@@ -111,7 +115,32 @@ data class PendingHoldStatusResponse(
             element.toString().removeSurrounding("\"")
         }
     }
+
+    val refundRequestIdString: String? get() = refundRequestId?.let {
+        try {
+            it.jsonPrimitive.content
+        } catch (_: Exception) {
+            it.toString().removeSurrounding("\"")
+        }
+    }
 }
+
+@Serializable
+data class ApproveRefundRequest(
+    @SerialName("refundRequestId") val refundRequestId: String,
+    @SerialName("pendingHoldId") val pendingHoldId: String,
+)
+
+@Serializable
+data class RejectRefundRequest(
+    @SerialName("refundRequestId") val refundRequestId: String,
+)
+
+@Serializable
+data class GenericRefundResponse(
+    @SerialName("message") val message: String? = null,
+    @SerialName("amount") val amount: Double? = null,
+)
 
 @Serializable
 data class RefundRequest(

@@ -299,7 +299,7 @@ class WalletService @Inject constructor(
         return try {
             val clientData = sessionStore.getSession(clientId)
             val consultantData = sessionStore.getSession(consultantId)
-            
+
             val request = RefundRequest(
                 clientId = clientData?.webuddyName ?: clientId,
                 consultantId = consultantData?.webuddyName ?: consultantId,
@@ -310,6 +310,30 @@ class WalletService @Inject constructor(
             Result.success(response)
         } catch (e: Exception) {
             Timber.e(e, "Failed to request refund")
+            Result.failure(e)
+        }
+    }
+
+    suspend fun approveRefund(refundRequestId: String, pendingHoldId: String): Result<GenericRefundResponse> {
+        return try {
+            val response = walletApi.approveRefund(
+                ApproveRefundRequest(refundRequestId = refundRequestId, pendingHoldId = pendingHoldId)
+            )
+            Timber.d("Refund approved: ${response.message}")
+            Result.success(response)
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to approve refund")
+            Result.failure(e)
+        }
+    }
+
+    suspend fun rejectRefund(refundRequestId: String): Result<GenericRefundResponse> {
+        return try {
+            val response = walletApi.rejectRefund(RejectRefundRequest(refundRequestId = refundRequestId))
+            Timber.d("Refund rejected: ${response.message}")
+            Result.success(response)
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to reject refund")
             Result.failure(e)
         }
     }

@@ -62,6 +62,10 @@ data class MessagesState(
     val pendingHoldId: String? = null,
     val isRefundRequestInProgress: Boolean = false,
     val isRefundButtonVisible: Boolean = false,
+    /** True when the logged-in user is the consultant in this hold (i.e. the recipient of the refund request). */
+    val isConsultantInThisRoom: Boolean = false,
+    /** Refund request id awaiting consultant decision. Non-null only when refundStatus == "requested". */
+    val refundRequestId: String? = null,
     val eventSink: (MessagesEvents) -> Unit
 ) {
     val isTombstoned = successorRoom != null

@@ -229,8 +229,11 @@ class MessagesPresenter(
 
         val refundStatus = remember { mutableStateOf<String?>(null) }
         val pendingHoldId = remember { mutableStateOf<String?>(null) }
+        val refundRequestId = remember { mutableStateOf<String?>(null) }
+        val isConsultantInThisRoom = remember { mutableStateOf(false) }
         val isRefundButtonVisible = remember { mutableStateOf(false) }
         val isRefundRequestInProgress = remember { mutableStateOf(false) }
+        val notifiedRefundRequestIds = remember { mutableSetOf<String>() }
         val otherUserId = dmRoomMember?.userId?.value
 
         LaunchedEffect(otherUserId) {
@@ -239,16 +242,28 @@ class MessagesPresenter(
                 otherUserId?.let { partnerId ->
                     try {
                         val status = walletService.getPendingHoldStatus(myUserId, partnerId)
-                        Timber.d("[Refund] PendingHoldStatus: isActive=${status.isActive}, isRefundActive=${status.isRefundActive}, refundStatus=${status.refundStatus}, holdId=${status.holdIdString}")
-                        if (status.isRefundActive == 1) {
+                        Timber.d("[Refund] PendingHoldStatus: isActive=${status.isActive}, isRefundActive=${status.isRefundActive}, refundStatus=${status.refundStatus}, holdId=${status.holdIdString}, refundReqId=${status.refundRequestIdString}, clientId=${status.clientId}, consultantId=${status.consultantId}")
+                        // Server bidirectional lookup: compare my id against the hold's consultantId to know my role.
+                        val amConsultant = status.consultantId != null && status.consultantId == myUserId
+                        isConsultantInThisRoom.value = amConsultant
+
+                        if (status.exists && status.isRefundActive == 1) {
                             refundStatus.value = status.refundStatus
                             pendingHoldId.value = status.holdIdString
-                            // Show button whenever a hold is active (isRefundActive==1)
-                            // Button will be disabled if status is already "approved" or "requested"
+                            refundRequestId.value = status.refundRequestIdString
                             isRefundButtonVisible.value = true
+
+                            // In-app notification for consultants when a new refund request comes in.
+                            val reqId = status.refundRequestIdString
+                            if (amConsultant && status.refundStatus == "requested" && reqId != null && notifiedRefundRequestIds.add(reqId)) {
+                                snackbarDispatcher.post(SnackbarMessage(CommonStrings.common_success))
+                            }
                         } else {
-                            Timber.d("[Refund] isRefundActive=${status.isRefundActive}, hiding refund button")
+                            Timber.d("[Refund] No active hold; hiding refund UI")
                             isRefundButtonVisible.value = false
+                            refundStatus.value = null
+                            pendingHoldId.value = null
+                            refundRequestId.value = null
                         }
                     } catch (e: Exception) {
                         Timber.e(e, "[Refund] Failed to get pending hold status for $partnerId")
@@ -371,6 +386,46 @@ class MessagesPresenter(
                         isRefundRequestInProgress.value = false
                     }
                 }
+                is MessagesEvents.ApproveRefund -> {
+                    if (isRefundRequestInProgress.value) return
+                    val reqId = refundRequestId.value
+                    val holdId = pendingHoldId.value
+                    if (reqId == null || holdId == null) {
+                        Timber.w("[Refund] Cannot approve: reqId=$reqId, holdId=$holdId")
+                        return
+                    }
+                    localCoroutineScope.launch {
+                        isRefundRequestInProgress.value = true
+                        val result = walletService.approveRefund(reqId, holdId)
+                        result.onSuccess {
+                            refundStatus.value = "approved"
+                            isRefundButtonVisible.value = false
+                            snackbarDispatcher.post(SnackbarMessage(CommonStrings.common_success))
+                        }.onFailure {
+                            snackbarDispatcher.post(SnackbarMessage(CommonStrings.common_error))
+                        }
+                        isRefundRequestInProgress.value = false
+                    }
+                }
+                is MessagesEvents.RejectRefund -> {
+                    if (isRefundRequestInProgress.value) return
+                    val reqId = refundRequestId.value
+                    if (reqId == null) {
+                        Timber.w("[Refund] Cannot reject: reqId is null")
+                        return
+                    }
+                    localCoroutineScope.launch {
+                        isRefundRequestInProgress.value = true
+                        val result = walletService.rejectRefund(reqId)
+                        result.onSuccess {
+                            refundStatus.value = "rejected"
+                            snackbarDispatcher.post(SnackbarMessage(CommonStrings.common_success))
+                        }.onFailure {
+                            snackbarDispatcher.post(SnackbarMessage(CommonStrings.common_error))
+                        }
+                        isRefundRequestInProgress.value = false
+                    }
+                }
             }
         }
 
@@ -406,6 +461,8 @@ class MessagesPresenter(
             pendingHoldId = pendingHoldId.value,
             isRefundRequestInProgress = isRefundRequestInProgress.value,
             isRefundButtonVisible = isRefundButtonVisible.value,
+            isConsultantInThisRoom = isConsultantInThisRoom.value,
+            refundRequestId = refundRequestId.value,
             eventSink = ::handleEvent,
         )
     }

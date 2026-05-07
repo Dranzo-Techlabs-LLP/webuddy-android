@@ -74,4 +74,14 @@ interface WalletApi {
     suspend fun requestRefund(
         @Body request: RefundRequest
     ): RefundResponse
+
+    @POST("v1/refund/approve")
+    suspend fun approveRefund(
+        @Body request: ApproveRefundRequest
+    ): GenericRefundResponse
+
+    @POST("v1/refund/reject")
+    suspend fun rejectRefund(
+        @Body request: RejectRefundRequest
+    ): GenericRefundResponse
 }

@@ -242,7 +242,10 @@ fun MessagesView(
                             isRefundButtonVisible = state.isRefundButtonVisible,
                             refundStatus = state.refundStatus,
                             isRefundRequestInProgress = state.isRefundRequestInProgress,
-                            onRefundClick = { state.eventSink(MessagesEvents.RequestRefund) }
+                            isConsultantInThisRoom = state.isConsultantInThisRoom,
+                            onRefundClick = { state.eventSink(MessagesEvents.RequestRefund) },
+                            onApproveRefundClick = { state.eventSink(MessagesEvents.ApproveRefund) },
+                            onRejectRefundClick = { state.eventSink(MessagesEvents.RejectRefund) },
                         )
                     }
                 },
