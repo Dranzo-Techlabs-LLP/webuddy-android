@@ -71,6 +71,8 @@ data class Transaction(
     @SerialName("amount") val amount: String,
     @SerialName("type") val type: String,
     @SerialName("status") val status: String,
+    /** Business source: RECHARGE, HOLD, HOLD_SETTLED, REFUND, REFERRAL. Used to render a human-readable label. */
+    @SerialName("source") val source: String? = null,
     @SerialName("metaData") val metaData: JsonElement? = null,
     @SerialName("createdAt") val createdAt: String? = null,
 )

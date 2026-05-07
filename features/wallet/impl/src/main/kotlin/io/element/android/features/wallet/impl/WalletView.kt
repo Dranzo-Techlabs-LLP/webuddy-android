@@ -325,11 +325,9 @@ fun TransactionRow(transaction: WalletTransaction) {
             style = io.element.android.compound.theme.ElementTheme.typography.fontBodySmRegular
         )
 
-        // Type Column
+        // Type Column — direction comes from txn_type (CREDIT/DEBIT/BONUS); label comes from source.
         Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-            val isCredit = transaction.type.contains("recharge", ignoreCase = true) || 
-                          transaction.type.contains("credit", ignoreCase = true) ||
-                          transaction.type.contains("CREDIT", ignoreCase = false)
+            val isCredit = !transaction.type.equals("DEBIT", ignoreCase = true)
             Icon(
                 imageVector = if (isCredit) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
                 contentDescription = null,
@@ -338,7 +336,7 @@ fun TransactionRow(transaction: WalletTransaction) {
             )
             Spacer(modifier = Modifier.size(4.dp))
             Text(
-                text = transaction.type.lowercase().replaceFirstChar { it.uppercase() },
+                text = transactionLabel(transaction),
                 style = io.element.android.compound.theme.ElementTheme.typography.fontBodySmRegular,
                 maxLines = 1
             )
@@ -362,6 +360,23 @@ fun TransactionRow(transaction: WalletTransaction) {
             },
             style = io.element.android.compound.theme.ElementTheme.typography.fontBodySmMedium
         )
+    }
+}
+
+private fun transactionLabel(t: WalletTransaction): String {
+    // Prefer the business source (RECHARGE / HOLD / HOLD_SETTLED / REFUND / REFERRAL).
+    // Fall back to the raw txn_type for legacy rows that have no source.
+    val key = t.source?.uppercase() ?: t.type.uppercase()
+    return when (key) {
+        "RECHARGE" -> "Recharge"
+        "HOLD" -> "Chat hold"
+        "HOLD_SETTLED" -> "Earnings"
+        "REFUND" -> "Refund"
+        "REFERRAL" -> "Referral bonus"
+        "BONUS" -> "Bonus"
+        "CREDIT" -> "Credit"
+        "DEBIT" -> "Debit"
+        else -> key.lowercase().replaceFirstChar { it.uppercase() }
     }
 }
 

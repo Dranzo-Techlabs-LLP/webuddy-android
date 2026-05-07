@@ -61,6 +61,7 @@ class WalletPresenter @Inject constructor(
                                 amount = it.amount.toDoubleOrNull() ?: 0.0,
                                 status = it.status,
                                 type = it.type,
+                                source = it.source,
                                 date = it.createdAt ?: ""
                             )
                         }

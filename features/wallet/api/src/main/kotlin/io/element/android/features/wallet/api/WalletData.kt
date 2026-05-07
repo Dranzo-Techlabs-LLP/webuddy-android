@@ -14,11 +14,16 @@ data class RechargeOrderResponse(val orderId: String, val amountInPaise: Int, va
 
 /**
  * Data class representing a wallet transaction.
+ *
+ * - [type] is the ledger direction: CREDIT, DEBIT, BONUS.
+ * - [source] is the business cause: RECHARGE, HOLD, HOLD_SETTLED, REFUND, REFERRAL.
+ *   May be null for legacy rows.
  */
 data class WalletTransaction(
     val id: String,
     val amount: Double,
     val status: String,
     val type: String,
-    val date: String
+    val source: String?,
+    val date: String,
 )
