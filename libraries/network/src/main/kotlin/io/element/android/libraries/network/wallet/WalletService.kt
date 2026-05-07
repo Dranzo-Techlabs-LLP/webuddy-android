@@ -35,6 +35,10 @@ class WalletService @Inject constructor(
     private val _originalMaxCredits = MutableStateFlow<Int?>(null)
     val originalMaxCredits: StateFlow<Int?> = _originalMaxCredits.asStateFlow()
 
+    // Current logged-in user's role. null = not yet known/loaded; true = consultant; false = normal client.
+    private val _isCurrentUserConsultant = MutableStateFlow<Boolean?>(null)
+    val isCurrentUserConsultant: StateFlow<Boolean?> = _isCurrentUserConsultant.asStateFlow()
+
     private val creditsCache = ConcurrentHashMap<String, Int>()
     private val orderToTransactionMap = ConcurrentHashMap<String, String>()
 
@@ -90,11 +94,13 @@ class WalletService @Inject constructor(
             } ?: 0
             _credits.value = balance
 
-            val maxCreditsValue = response.maxCredits?.let { 
-                it.jsonPrimitive.content.toDoubleOrNull()?.toInt() 
+            val maxCreditsValue = response.maxCredits?.let {
+                it.jsonPrimitive.content.toDoubleOrNull()?.toInt()
             } ?: 100
             _maxCredits.value = maxCreditsValue
             _originalMaxCredits.value = maxCreditsValue
+
+            response.isConsultant?.let { _isCurrentUserConsultant.value = it == 1 }
 
             creditsCache[userId] = maxCreditsValue
         } catch (e: Exception) {
@@ -134,6 +140,24 @@ class WalletService @Inject constructor(
 
     fun setMaxCredits(maxCredits: Int) {
         _maxCredits.value = maxCredits
+    }
+
+    /**
+     * Persist the current user's role (consultant vs. normal client) to the wallet API.
+     * Returns success once the PATCH succeeds and the local cache is updated.
+     */
+    suspend fun setRole(userId: String, isConsultant: Boolean): Result<Unit> {
+        return try {
+            val sessionData = sessionStore.getSession(userId)
+            val identifier = sessionData?.webuddyName ?: userId
+            walletApi.updateWallet(identifier, WalletUpdateRequest(isConsultant = if (isConsultant) 1 else 0))
+            _isCurrentUserConsultant.value = isConsultant
+            Timber.d("Role set for $userId: isConsultant=$isConsultant")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to set role for $userId")
+            Result.failure(e)
+        }
     }
 
     suspend fun updateMaxCredits(userId: String, maxCredits: Int) {
@@ -223,10 +247,15 @@ class WalletService @Inject constructor(
     }
 
     suspend fun initiateHold(clientId: String, consultantId: String): Result<Unit> {
+        // Consultants don't pay other consultants — only normal users (clients) initiate holds.
+        if (_isCurrentUserConsultant.value == true) {
+            Timber.d("Skipping initiateHold: current user is a consultant")
+            return Result.success(Unit)
+        }
         return try {
             val clientData = sessionStore.getSession(clientId)
             val consultantData = sessionStore.getSession(consultantId)
-            
+
             val request = InitiateHoldRequest(
                 clientId = clientData?.webuddyName ?: clientId,
                 consultantId = consultantData?.webuddyName ?: consultantId

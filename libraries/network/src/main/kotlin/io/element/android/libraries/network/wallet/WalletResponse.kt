@@ -17,17 +17,20 @@ data class WalletResponse(
     @SerialName("current_hold") val currentHold: JsonElement? = null,
     @SerialName("max_credits") val maxCredits: JsonElement? = null,
     @SerialName("Webuddy_name") val webuddyName: String? = null,
+    @SerialName("isConsultant") val isConsultant: Int? = null,
 )
 
 @Serializable
 data class WalletCreateRequest(
     @SerialName("name") val name: String,
     @SerialName("Webuddy_name") val webuddyName: String,
+    @SerialName("isConsultant") val isConsultant: Int = 0,
 )
 
 @Serializable
 data class WalletUpdateRequest(
-    @SerialName("max_credits") val maxCredits: Int
+    @SerialName("max_credits") val maxCredits: Int? = null,
+    @SerialName("isConsultant") val isConsultant: Int? = null,
 )
 
 @Serializable
@@ -84,7 +87,7 @@ data class TransactionHistoryResponse(
 @Serializable
 data class InitiateHoldRequest(
     @SerialName("clientId") val clientId: String,
-    @SerialName("consultandId") val consultantId: String, // DB column is 'consultandId' (intentional typo in DB)
+    @SerialName("consultantId") val consultantId: String,
 )
 
 @Serializable

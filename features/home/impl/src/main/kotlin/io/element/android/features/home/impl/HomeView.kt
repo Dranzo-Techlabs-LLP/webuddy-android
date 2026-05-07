@@ -128,7 +128,39 @@ fun HomeView(
                 .background(ElementTheme.colors.bgCanvasDefault)
         )
         acceptDeclineInviteView()
+
+        if (homeState.showRolePicker) {
+            RolePickerDialog(
+                onPick = { isConsultant -> homeState.eventSink(HomeEvents.PickRole(isConsultant)) },
+            )
+        }
     }
+}
+
+@Composable
+private fun RolePickerDialog(
+    onPick: (Boolean) -> Unit,
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = { /* mandatory: cannot be dismissed without picking */ },
+        title = { androidx.compose.material3.Text("Choose your role") },
+        text = {
+            androidx.compose.material3.Text(
+                "Please tell us how you'll use Webuddy. This decides whether you can initiate paid chats. " +
+                    "Consultants receive holds; normal users initiate them."
+            )
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = { onPick(true) }) {
+                androidx.compose.material3.Text("I'm a Consultant")
+            }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = { onPick(false) }) {
+                androidx.compose.material3.Text("I'm a Normal User")
+            }
+        },
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

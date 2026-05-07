@@ -60,6 +60,7 @@ internal fun aHomeState(
     canReportBug: Boolean = true,
     directLogoutState: DirectLogoutState = aDirectLogoutState(),
     credits: Int? = 300,
+    showRolePicker: Boolean = false,
     eventSink: (HomeEvents) -> Unit = {}
 ) = HomeState(
     currentUserAndNeighbors = currentUserAndNeighbors.toImmutableList(),
@@ -72,5 +73,6 @@ internal fun aHomeState(
     roomListState = roomListState,
     homeSpacesState = homeSpacesState,
     credits = credits,
+    showRolePicker = showRolePicker,
     eventSink = eventSink,
 )

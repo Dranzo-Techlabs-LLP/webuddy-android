@@ -61,13 +61,13 @@ interface WalletApi {
     @GET("v1/pending-holds/exists")
     suspend fun checkHoldExists(
         @Query("clientId") clientId: String,
-        @Query("consultandId") consultantId: String  // DB column is 'consultandId'
+        @Query("consultantId") consultantId: String
     ): HoldExistsResponse
 
     @GET("v1/pending-holds/status")
     suspend fun getPendingHoldStatus(
         @Query("clientId") clientId: String,
-        @Query("consultandId") consultantId: String
+        @Query("consultantId") consultantId: String
     ): PendingHoldStatusResponse
 
     @POST("v1/refund/request")
