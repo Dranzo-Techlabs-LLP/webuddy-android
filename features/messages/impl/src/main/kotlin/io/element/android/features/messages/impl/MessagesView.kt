@@ -222,31 +222,41 @@ fun MessagesView(
                             onBackClick = onBackClick,
                         )
                     } else {
-                        MessagesViewTopBar(
-                            roomName = state.roomName,
-                            roomAvatar = state.roomAvatar,
-                            isTombstoned = state.isTombstoned,
-                            heroes = state.heroes,
-                            roomCallState = state.roomCallState,
-                            dmUserIdentityState = state.dmUserVerificationState,
-                            onBackClick = { hidingKeyboard { onBackClick() } },
-                            onRoomDetailsClick = { hidingKeyboard { onRoomDetailsClick() } },
-                            onJoinCallClick = onJoinCallClick,
-                            onSummarizeClick = { duration ->
-                                if (duration != null) {
-                                    state.eventSink(MessagesEvents.Summarize(duration))
-                                } else {
-                                    state.eventSink(MessagesEvents.AskAI("DUMMY_TRIGGER"))
-                                }
-                            },
-                            isRefundButtonVisible = state.isRefundButtonVisible,
-                            refundStatus = state.refundStatus,
-                            isRefundRequestInProgress = state.isRefundRequestInProgress,
-                            isConsultantInThisRoom = state.isConsultantInThisRoom,
-                            onRefundClick = { state.eventSink(MessagesEvents.RequestRefund) },
-                            onApproveRefundClick = { state.eventSink(MessagesEvents.ApproveRefund) },
-                            onRejectRefundClick = { state.eventSink(MessagesEvents.RejectRefund) },
-                        )
+                        androidx.compose.foundation.layout.Column {
+                            MessagesViewTopBar(
+                                roomName = state.roomName,
+                                roomAvatar = state.roomAvatar,
+                                isTombstoned = state.isTombstoned,
+                                heroes = state.heroes,
+                                roomCallState = state.roomCallState,
+                                dmUserIdentityState = state.dmUserVerificationState,
+                                onBackClick = { hidingKeyboard { onBackClick() } },
+                                onRoomDetailsClick = { hidingKeyboard { onRoomDetailsClick() } },
+                                onJoinCallClick = onJoinCallClick,
+                                onSummarizeClick = { duration ->
+                                    if (duration != null) {
+                                        state.eventSink(MessagesEvents.Summarize(duration))
+                                    } else {
+                                        state.eventSink(MessagesEvents.AskAI("DUMMY_TRIGGER"))
+                                    }
+                                },
+                                isRefundButtonVisible = state.isRefundButtonVisible,
+                                refundStatus = state.refundStatus,
+                                isRefundRequestInProgress = state.isRefundRequestInProgress,
+                                isConsultantInThisRoom = state.isConsultantInThisRoom,
+                                onRefundClick = { state.eventSink(MessagesEvents.RequestRefund) },
+                                onApproveRefundClick = { state.eventSink(MessagesEvents.ApproveRefund) },
+                                onRejectRefundClick = { state.eventSink(MessagesEvents.RejectRefund) },
+                            )
+                            // Banner explaining the in-flight refund request to the consultant.
+                            if (state.isConsultantInThisRoom && state.refundStatus == "requested") {
+                                io.element.android.features.messages.impl.topbars.RefundRequestBanner(
+                                    isInProgress = state.isRefundRequestInProgress,
+                                    onApprove = { state.eventSink(MessagesEvents.ApproveRefund) },
+                                    onReject = { state.eventSink(MessagesEvents.RejectRefund) },
+                                )
+                            }
+                        }
                     }
                 },
                 content = { padding ->
