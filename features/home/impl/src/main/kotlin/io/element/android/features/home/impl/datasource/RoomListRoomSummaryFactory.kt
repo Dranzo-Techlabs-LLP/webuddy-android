@@ -40,8 +40,12 @@ class RoomListRoomSummaryFactory(
         
         Timber.d("Processing room ${roomInfo.name}. Hero: ${heroUserId?.value}")
         
-        // Use the full Matrix ID (e.g. @shinky777:matrix.org) to match Webuddy_name in DB
-        val credits = heroUserId?.let { walletService.getMaxCredits(it.value) }
+        // Per-row max-credits is a price tag for the consultant; only clients need it. Skip the lookup for consultants.
+        val credits = if (walletService.isCurrentUserConsultant.value == true) {
+            null
+        } else {
+            heroUserId?.let { walletService.getMaxCredits(it.value) }
+        }
         
         return RoomListRoomSummary(
             id = roomSummary.roomId.value,
