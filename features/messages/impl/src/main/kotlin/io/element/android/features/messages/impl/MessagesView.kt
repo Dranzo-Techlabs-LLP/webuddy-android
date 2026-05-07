@@ -233,12 +233,16 @@ fun MessagesView(
                             onRoomDetailsClick = { hidingKeyboard { onRoomDetailsClick() } },
                             onJoinCallClick = onJoinCallClick,
                             onSummarizeClick = { duration ->
-            if (duration != null) {
-                state.eventSink(MessagesEvents.Summarize(duration))
-            } else {
-                state.eventSink(MessagesEvents.AskAI("DUMMY_TRIGGER"))
-            }
-        }
+                                if (duration != null) {
+                                    state.eventSink(MessagesEvents.Summarize(duration))
+                                } else {
+                                    state.eventSink(MessagesEvents.AskAI("DUMMY_TRIGGER"))
+                                }
+                            },
+                            isRefundButtonVisible = state.isRefundButtonVisible,
+                            refundStatus = state.refundStatus,
+                            isRefundRequestInProgress = state.isRefundRequestInProgress,
+                            onRefundClick = { state.eventSink(MessagesEvents.RequestRefund) }
                         )
                     }
                 },
@@ -389,7 +393,7 @@ fun MessagesView(
 @Composable
 private fun SummaryDialog(state: MessagesState) {
     val summary = state.summary
-    var showAskAIDialog by remember { mutableStateOf(false) }
+    val showAskAIDialog = remember { mutableStateOf(false) }
 
     when (summary) {
         is AsyncData.Loading -> {
@@ -420,12 +424,12 @@ private fun SummaryDialog(state: MessagesState) {
     // This is a hack to show the Ask AI dialog when the top bar menu is clicked
     LaunchedEffect(state.summary) {
         if (state.summary.dataOrNull() == "ASK_AI_TRIGGER") {
-            showAskAIDialog = true
+            showAskAIDialog.value = true
             state.eventSink(MessagesEvents.DismissSummary)
         }
     }
 
-    if (showAskAIDialog) {
+    if (showAskAIDialog.value) {
         var questionState by remember { mutableStateOf("") }
         TextFieldDialog(
             title = "Ask Clariva AI",
@@ -434,10 +438,10 @@ private fun SummaryDialog(state: MessagesState) {
             value = questionState,
             onSubmit = {
                 state.eventSink(MessagesEvents.AskAI(it))
-                showAskAIDialog = false
+                showAskAIDialog.value = false
             },
             onDismissRequest = {
-                showAskAIDialog = false
+                showAskAIDialog.value = false
             }
         )
     }

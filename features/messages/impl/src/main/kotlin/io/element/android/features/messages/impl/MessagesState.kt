@@ -58,6 +58,10 @@ data class MessagesState(
     val roomMemberModerationState: RoomMemberModerationState,
     val successorRoom: SuccessorRoom?,
     val summary: AsyncData<String>,
+    val refundStatus: String? = null,
+    val pendingHoldId: String? = null,
+    val isRefundRequestInProgress: Boolean = false,
+    val isRefundButtonVisible: Boolean = false,
     val eventSink: (MessagesEvents) -> Unit
 ) {
     val isTombstoned = successorRoom != null

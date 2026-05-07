@@ -10,6 +10,7 @@ package io.element.android.libraries.network.wallet
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.jsonPrimitive
 
 @Serializable
 data class WalletResponse(
@@ -83,10 +84,41 @@ data class TransactionHistoryResponse(
 @Serializable
 data class InitiateHoldRequest(
     @SerialName("clientId") val clientId: String,
-    @SerialName("consultantId") val consultantId: String,
+    @SerialName("consultandId") val consultantId: String, // DB column is 'consultandId' (intentional typo in DB)
 )
 
 @Serializable
 data class HoldExistsResponse(
     @SerialName("exists") val exists: Boolean,
+)
+
+@Serializable
+data class PendingHoldStatusResponse(
+    @SerialName("isActive") val isActive: Int = 1,         // DB: tinyint(1), 1=active 0=inactive
+    @SerialName("isRefundActive") val isRefundActive: Int = 1, // DB: tinyint, 1=refund active 0=closed
+    @SerialName("refund_status") val refundStatus: String = "none", // DB enum: 'none','requested','approved','rejected'
+    @SerialName("pendingHoldId") val pendingHoldId: JsonElement? = null, // API-level field, not a DB column
+    @SerialName("id") val id: JsonElement? = null // Fallback to DB-level id field
+) {
+    val holdIdString: String? get() {
+        val element = pendingHoldId ?: id ?: return null
+        return try {
+            element.jsonPrimitive.content
+        } catch (_: Exception) {
+            element.toString().removeSurrounding("\"")
+        }
+    }
+}
+
+@Serializable
+data class RefundRequest(
+    @SerialName("clientId") val clientId: String,
+    @SerialName("consultantId") val consultantId: String,
+    @SerialName("pendingHoldId") val pendingHoldId: String
+)
+
+@Serializable
+data class RefundResponse(
+    @SerialName("success") val success: Boolean,
+    @SerialName("message") val message: String? = null
 )

@@ -35,7 +35,7 @@ class WalletService @Inject constructor(
     private val _originalMaxCredits = MutableStateFlow<Int?>(null)
     val originalMaxCredits: StateFlow<Int?> = _originalMaxCredits.asStateFlow()
 
-    private val creditsCache = ConcurrentHashMap<String, Int?>()
+    private val creditsCache = ConcurrentHashMap<String, Int>()
     private val orderToTransactionMap = ConcurrentHashMap<String, String>()
 
     private val _paymentResults = MutableSharedFlow<WalletPaymentResult>(extraBufferCapacity = 1)
@@ -253,6 +253,35 @@ class WalletService @Inject constructor(
         } catch (e: Exception) {
             Timber.e(e, "Failed to check hold existence between $clientId and $consultantId")
             false
+        }
+    }
+    suspend fun getPendingHoldStatus(clientId: String, consultantId: String): PendingHoldStatusResponse {
+        val clientData = sessionStore.getSession(clientId)
+        val consultantData = sessionStore.getSession(consultantId)
+        
+        return walletApi.getPendingHoldStatus(
+            clientId = clientData?.webuddyName ?: clientId,
+            consultantId = consultantData?.webuddyName ?: consultantId
+        )
+    }
+
+    suspend fun
+        requestRefund(clientId: String, consultantId: String, pendingHoldId: String): Result<RefundResponse> {
+        return try {
+            val clientData = sessionStore.getSession(clientId)
+            val consultantData = sessionStore.getSession(consultantId)
+            
+            val request = RefundRequest(
+                clientId = clientData?.webuddyName ?: clientId,
+                consultantId = consultantData?.webuddyName ?: consultantId,
+                pendingHoldId = pendingHoldId
+            )
+            val response = walletApi.requestRefund(request)
+            Timber.d("Refund requested successfully: ${response.message}")
+            Result.success(response)
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to request refund")
+            Result.failure(e)
         }
     }
 }

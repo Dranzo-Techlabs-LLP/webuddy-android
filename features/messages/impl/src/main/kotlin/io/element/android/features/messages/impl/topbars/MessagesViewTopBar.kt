@@ -73,9 +73,13 @@ internal fun MessagesViewTopBar(
     onJoinCallClick: () -> Unit,
     onBackClick: () -> Unit,
     onSummarizeClick: (SummaryDuration?) -> Unit,
+    isRefundButtonVisible: Boolean,
+    refundStatus: String?,
+    isRefundRequestInProgress: Boolean,
+    onRefundClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var showSummaryMenu by remember { mutableStateOf(false) }
+    val showSummaryMenu = remember { mutableStateOf(false) }
     TopAppBar(
         modifier = modifier,
         navigationIcon = {
@@ -119,34 +123,70 @@ internal fun MessagesViewTopBar(
             }
         },
         actions = {
-            IconButton(onClick = { showSummaryMenu = true }) {
+            if (isRefundButtonVisible && (refundStatus == "none" || refundStatus == null)) {
+                val showRefundConfirm = remember { mutableStateOf(false) }
+
+                IconButton(
+                    onClick = { showRefundConfirm.value = true },
+                    enabled = !isRefundRequestInProgress
+                ) {
+                    val iconTint = if (!isRefundRequestInProgress) {
+                        ElementTheme.colors.iconPrimary
+                    } else {
+                        ElementTheme.colors.iconDisabled
+                    }
+                    Icon(
+                        imageVector = CompoundIcons.Restart(),
+                        contentDescription = "Request Refund",
+                        tint = iconTint
+                    )
+                }
+
+                if (showRefundConfirm.value) {
+                    io.element.android.libraries.designsystem.components.dialogs.ConfirmationDialog(
+                        title = "Request Refund",
+                        content = "Are you sure you want to request a refund?",
+                        submitText = "Request",
+                        cancelText = "Cancel",
+                        onSubmitClick = {
+                            showRefundConfirm.value = false
+                            onRefundClick()
+                        },
+                        onDismiss = {
+                            showRefundConfirm.value = false
+                        }
+                    )
+                }
+            }
+
+            IconButton(onClick = { showSummaryMenu.value = true }) {
                 Icon(
                     imageVector = CompoundIcons.History(),
                     contentDescription = "Summarize"
                 )
             }
             io.element.android.libraries.designsystem.theme.components.DropdownMenu(
-                expanded = showSummaryMenu,
-                onDismissRequest = { showSummaryMenu = false }
+                expanded = showSummaryMenu.value,
+                onDismissRequest = { showSummaryMenu.value = false }
             ) {
                 io.element.android.libraries.designsystem.theme.components.DropdownMenuItem(
                     text = { Text("Summarize (24h)") },
                     onClick = {
-                        showSummaryMenu = false
+                        showSummaryMenu.value = false
                         onSummarizeClick(SummaryDuration.LastDay)
                     }
                 )
                 io.element.android.libraries.designsystem.theme.components.DropdownMenuItem(
                     text = { Text("Summarize (7d)") },
                     onClick = {
-                        showSummaryMenu = false
+                        showSummaryMenu.value = false
                         onSummarizeClick(SummaryDuration.LastWeek)
                     }
                 )
                 io.element.android.libraries.designsystem.theme.components.DropdownMenuItem(
                     text = { Text("Ask AI about chat") },
                     onClick = {
-                        showSummaryMenu = false
+                        showSummaryMenu.value = false
                         onSummarizeClick(null) // Signal Ask AI
                     }
                 )
@@ -216,6 +256,10 @@ internal fun MessagesViewTopBarPreview() = ElementPreview {
         heroes = heroes,
         roomCallState = roomCallState,
         dmUserIdentityState = dmUserIdentityState,
+        isRefundButtonVisible = false,
+        refundStatus = null,
+        isRefundRequestInProgress = false,
+        onRefundClick = {},
         onRoomDetailsClick = {},
         onJoinCallClick = {},
         onBackClick = {},

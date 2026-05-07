@@ -23,6 +23,7 @@ sealed interface MessagesEvents {
     data class Summarize(val duration: SummaryDuration) : MessagesEvents
     data class AskAI(val question: String) : MessagesEvents
     data object DismissSummary : MessagesEvents
+    data object RequestRefund : MessagesEvents
 }
 
 enum class SummaryDuration {

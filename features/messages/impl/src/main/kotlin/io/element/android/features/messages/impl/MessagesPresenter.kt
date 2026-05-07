@@ -124,6 +124,7 @@ class MessagesPresenter(
     private val addRecentEmoji: AddRecentEmoji,
     private val markAsFullyRead: MarkAsFullyRead,
     private val ollamaApi: io.element.android.libraries.network.ollama.OllamaApi,
+    private val walletService: io.element.android.libraries.network.wallet.WalletService,
     @SessionCoroutineScope private val sessionCoroutineScope: CoroutineScope,
 ) : Presenter<MessagesState> {
     @AssistedFactory
@@ -226,6 +227,37 @@ class MessagesPresenter(
 
         val summary = remember { mutableStateOf<AsyncData<String>>(AsyncData.Uninitialized) }
 
+        val refundStatus = remember { mutableStateOf<String?>(null) }
+        val pendingHoldId = remember { mutableStateOf<String?>(null) }
+        val isRefundButtonVisible = remember { mutableStateOf(false) }
+        val isRefundRequestInProgress = remember { mutableStateOf(false) }
+        val otherUserId = dmRoomMember?.userId?.value
+
+        LaunchedEffect(otherUserId) {
+            val myUserId = room.sessionId.value
+            while (true) {
+                otherUserId?.let { partnerId ->
+                    try {
+                        val status = walletService.getPendingHoldStatus(myUserId, partnerId)
+                        Timber.d("[Refund] PendingHoldStatus: isActive=${status.isActive}, isRefundActive=${status.isRefundActive}, refundStatus=${status.refundStatus}, holdId=${status.holdIdString}")
+                        if (status.isRefundActive == 1) {
+                            refundStatus.value = status.refundStatus
+                            pendingHoldId.value = status.holdIdString
+                            // Show button whenever a hold is active (isRefundActive==1)
+                            // Button will be disabled if status is already "approved" or "requested"
+                            isRefundButtonVisible.value = true
+                        } else {
+                            Timber.d("[Refund] isRefundActive=${status.isRefundActive}, hiding refund button")
+                            isRefundButtonVisible.value = false
+                        }
+                    } catch (e: Exception) {
+                        Timber.e(e, "[Refund] Failed to get pending hold status for $partnerId")
+                    }
+                }
+                kotlinx.coroutines.delay(15000)
+            }
+        }
+
         fun handleSummarize(duration: SummaryDuration) {
             localCoroutineScope.launch {
                 summary.value = AsyncData.Loading()
@@ -319,6 +351,26 @@ class MessagesPresenter(
                 is MessagesEvents.Summarize -> handleSummarize(event.duration)
                 is MessagesEvents.AskAI -> handleAskAI(event.question)
                 is MessagesEvents.DismissSummary -> summary.value = AsyncData.Uninitialized
+                is MessagesEvents.RequestRefund -> {
+                    if (isRefundRequestInProgress.value) return
+                    val holdId = pendingHoldId.value
+                    val partnerId = otherUserId
+                    if (holdId == null || partnerId == null) {
+                        Timber.w("[Refund] Cannot request refund: holdId=$holdId, partnerId=$partnerId")
+                        return
+                    }
+                    localCoroutineScope.launch {
+                        isRefundRequestInProgress.value = true
+                        val result = walletService.requestRefund(room.sessionId.value, partnerId, holdId)
+                        result.onSuccess {
+                            refundStatus.value = "requested"
+                            snackbarDispatcher.post(SnackbarMessage(CommonStrings.common_success))
+                        }.onFailure {
+                            snackbarDispatcher.post(SnackbarMessage(CommonStrings.common_error))
+                        }
+                        isRefundRequestInProgress.value = false
+                    }
+                }
             }
         }
 
@@ -350,6 +402,10 @@ class MessagesPresenter(
             roomMemberModerationState = roomMemberModerationState,
             successorRoom = roomInfo.successorRoom,
             summary = summary.value,
+            refundStatus = refundStatus.value,
+            pendingHoldId = pendingHoldId.value,
+            isRefundRequestInProgress = isRefundRequestInProgress.value,
+            isRefundButtonVisible = isRefundButtonVisible.value,
             eventSink = ::handleEvent,
         )
     }
@@ -536,7 +592,7 @@ class MessagesPresenter(
         }
     }
 
-    private suspend fun handleActionAddCaption(
+    private fun handleActionAddCaption(
         targetEvent: TimelineItem.Event,
         composerState: MessageComposerState,
     ) {
@@ -549,7 +605,7 @@ class MessagesPresenter(
         )
     }
 
-    private suspend fun handleActionEditCaption(
+    private fun handleActionEditCaption(
         targetEvent: TimelineItem.Event,
         composerState: MessageComposerState,
     ) {

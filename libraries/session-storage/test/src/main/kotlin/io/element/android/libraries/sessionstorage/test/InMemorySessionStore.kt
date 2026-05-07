@@ -20,6 +20,7 @@ class InMemorySessionStore(
     initialList: List<SessionData> = emptyList(),
     private val updateUserProfileResult: (String, String?, String?) -> Unit = { _, _, _ -> error("Not implemented") },
     private val setLatestSessionResult: (String) -> Unit = { error("Not implemented") },
+    private val updateWebuddyNameResult: (String, String?) -> Unit = { _, _ -> error("Not implemented") },
 ) : SessionStore {
     private val sessionDataListFlow = MutableStateFlow(initialList)
 
@@ -58,6 +59,10 @@ class InMemorySessionStore(
 
     override suspend fun updateUserProfile(sessionId: String, displayName: String?, avatarUrl: String?) {
         updateUserProfileResult(sessionId, displayName, avatarUrl)
+    }
+
+    override suspend fun updateWebuddyName(sessionId: String, webuddyName: String?) {
+        updateWebuddyNameResult(sessionId, webuddyName)
     }
 
     override suspend fun getSession(sessionId: String): SessionData? {

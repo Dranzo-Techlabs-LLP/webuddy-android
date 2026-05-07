@@ -34,7 +34,7 @@ interface WalletApi {
     @POST("v1/experts/bank-details")
     suspend fun postBankDetails(
         @Body request: BankDetails
-    ): Unit
+    )
 
     @POST("v1/wallet/recharge")
     suspend fun createOrder(
@@ -56,11 +56,22 @@ interface WalletApi {
     @POST("v1/pending-holds/initiate")
     suspend fun initiateHold(
         @Body request: InitiateHoldRequest
-    ): Unit
+    )
 
     @GET("v1/pending-holds/exists")
     suspend fun checkHoldExists(
         @Query("clientId") clientId: String,
-        @Query("consultantId") consultantId: String
+        @Query("consultandId") consultantId: String  // DB column is 'consultandId'
     ): HoldExistsResponse
+
+    @GET("v1/pending-holds/status")
+    suspend fun getPendingHoldStatus(
+        @Query("clientId") clientId: String,
+        @Query("consultandId") consultantId: String
+    ): PendingHoldStatusResponse
+
+    @POST("v1/refund/request")
+    suspend fun requestRefund(
+        @Body request: RefundRequest
+    ): RefundResponse
 }

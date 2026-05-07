@@ -16,10 +16,13 @@ import io.element.android.libraries.network.RetrofitFactory
 
 @BindingContainer
 @ContributesTo(AppScope::class)
+@Suppress("unused")
 object WalletModule {
     @Provides
     @SingleIn(AppScope::class)
     fun providesWalletApi(retrofitFactory: RetrofitFactory): WalletApi {
+        // Use 10.0.2.2 for Android emulators to connect to the host's localhost. 
+        // If you are using a physical device, you may need to use your machine's local IP address (e.g. 192.168.x.x) or use 'adb reverse tcp:3000 tcp:3000' and 'localhost'
         return retrofitFactory.create("https://wallet.dranzo.com/")
             .create(WalletApi::class.java)
     }
