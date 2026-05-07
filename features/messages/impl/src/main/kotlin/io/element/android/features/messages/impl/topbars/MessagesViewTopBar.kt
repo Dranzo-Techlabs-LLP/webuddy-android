@@ -79,7 +79,6 @@ internal fun MessagesViewTopBar(
     onRefundClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val showSummaryMenu = remember { mutableStateOf(false) }
     TopAppBar(
         modifier = modifier,
         navigationIcon = {
@@ -159,38 +158,7 @@ internal fun MessagesViewTopBar(
                 }
             }
 
-            IconButton(onClick = { showSummaryMenu.value = true }) {
-                Icon(
-                    imageVector = CompoundIcons.History(),
-                    contentDescription = "Summarize"
-                )
-            }
-            io.element.android.libraries.designsystem.theme.components.DropdownMenu(
-                expanded = showSummaryMenu.value,
-                onDismissRequest = { showSummaryMenu.value = false }
-            ) {
-                io.element.android.libraries.designsystem.theme.components.DropdownMenuItem(
-                    text = { Text("Summarize (24h)") },
-                    onClick = {
-                        showSummaryMenu.value = false
-                        onSummarizeClick(SummaryDuration.LastDay)
-                    }
-                )
-                io.element.android.libraries.designsystem.theme.components.DropdownMenuItem(
-                    text = { Text("Summarize (7d)") },
-                    onClick = {
-                        showSummaryMenu.value = false
-                        onSummarizeClick(SummaryDuration.LastWeek)
-                    }
-                )
-                io.element.android.libraries.designsystem.theme.components.DropdownMenuItem(
-                    text = { Text("Ask AI about chat") },
-                    onClick = {
-                        showSummaryMenu.value = false
-                        onSummarizeClick(null) // Signal Ask AI
-                    }
-                )
-            }
+            // Chat history / AI summary menu hidden for now; re-enable once the feature is complete.
             CallMenuItem(
                 roomCallState = roomCallState,
                 onJoinCallClick = onJoinCallClick,
