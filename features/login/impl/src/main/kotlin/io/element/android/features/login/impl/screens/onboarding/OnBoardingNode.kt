@@ -66,7 +66,12 @@ class OnBoardingNode(
             state = state,
             modifier = modifier,
             onSignIn = callback::navigateToSignInFlow,
-            onCreateAccount = { state.eventSink(OnBoardingEvents.OnCreateAccount) },
+            onCreateAccount = {
+                // Seed the default account provider, then navigate to the confirm screen,
+                // which now hosts the role picker before the Matrix.org webview is opened.
+                state.eventSink(OnBoardingEvents.OnCreateAccount)
+                callback.navigateToSignUpFlow()
+            },
             onSignInWithQrCode = callback::navigateToQrCode,
             onReportProblem = callback::navigateToBugReport,
             onOidcDetails = callback::navigateToOidc,

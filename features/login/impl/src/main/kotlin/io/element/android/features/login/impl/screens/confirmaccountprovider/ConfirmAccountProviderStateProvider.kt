@@ -32,11 +32,13 @@ open class ConfirmAccountProviderStateProvider : PreviewParameterProvider<Confir
 private fun aConfirmAccountProviderState(
     accountProvider: AccountProvider = anAccountProvider(),
     isAccountCreation: Boolean = false,
+    isConsultant: Boolean = false,
     loginMode: AsyncData<LoginMode> = AsyncData.Uninitialized,
     eventSink: (ConfirmAccountProviderEvents) -> Unit = {},
 ) = ConfirmAccountProviderState(
     accountProvider = accountProvider,
     isAccountCreation = isAccountCreation,
+    isConsultant = isConsultant,
     loginMode = loginMode,
     eventSink = eventSink
 )

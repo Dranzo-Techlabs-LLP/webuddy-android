@@ -39,6 +39,16 @@ class WalletService @Inject constructor(
     private val _isCurrentUserConsultant = MutableStateFlow<Boolean?>(null)
     val isCurrentUserConsultant: StateFlow<Boolean?> = _isCurrentUserConsultant.asStateFlow()
 
+    // Pending role selection picked on the account-creation screen, applied when the wallet user is created
+    // after the Matrix.org webview returns. Default = false (Normal User). Reset to default once consumed.
+    private val _pendingIsConsultant = MutableStateFlow(false)
+    val pendingIsConsultant: StateFlow<Boolean> = _pendingIsConsultant.asStateFlow()
+
+    fun setPendingIsConsultant(value: Boolean) {
+        Timber.d("Pending isConsultant set to $value")
+        _pendingIsConsultant.value = value
+    }
+
     private val creditsCache = ConcurrentHashMap<String, Int>()
     private val orderToTransactionMap = ConcurrentHashMap<String, String>()
 
@@ -59,22 +69,29 @@ class WalletService @Inject constructor(
 
     /**
      * Create a wallet user for the given Matrix userId.
+     * [isConsultant] should be 0 for normal users (default) or 1 for consultants.
      */
     //@Suppress("unused", "SpellCheckingInspection")
-    suspend fun createUser(userId: String): Result<WalletResponse> {
+    suspend fun createUser(userId: String, isConsultant: Int = 0): Result<WalletResponse> {
         return try {
             val request = WalletCreateRequest(
                 name = userId,
                 webuddyName = userId,
+                isConsultant = isConsultant,
             )
             val response = walletApi.createUser(request)
-            Timber.d("Wallet user created successfully for $userId")
-            
+            Timber.d("Wallet user created successfully for $userId with isConsultant=$isConsultant")
+
+            // Reflect the chosen role locally so the UI knows immediately.
+            _isCurrentUserConsultant.value = isConsultant == 1
+            // Pending role has now been applied; reset it.
+            _pendingIsConsultant.value = false
+
             // On success, update local database
             response.webuddyName?.let { webuddyName ->
                 sessionStore.updateWebuddyName(userId, webuddyName)
             }
-            
+
             Result.success(response)
         } catch (e: Exception) {
             Timber.e(e, "Failed to create wallet user for $userId")

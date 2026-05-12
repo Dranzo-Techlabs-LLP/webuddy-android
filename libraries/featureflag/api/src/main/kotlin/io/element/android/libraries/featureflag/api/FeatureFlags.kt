@@ -135,8 +135,8 @@ enum class FeatureFlags(
     ),
     SignInWithClassic(
         key = "feature.signin_with_classic",
-        title = "Sign in with Element Classic",
-        description = "Allow the application to sign in to the current Element Classic account.",
+        title = "Sign in with Clariva Classic",
+        description = "Allow the application to sign in to the current Clariva Classic account.",
         defaultValue = { false },
         isFinished = false,
     ),

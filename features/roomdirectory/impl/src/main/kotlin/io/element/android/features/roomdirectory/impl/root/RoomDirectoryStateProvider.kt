@@ -47,8 +47,8 @@ fun aRoomDescriptionList(): ImmutableList<RoomDescription> {
     return persistentListOf(
         RoomDescription(
             roomId = RoomId("!exa:matrix.org"),
-            name = "Element X Android",
-            topic = "Element X is a secure, private and decentralized messenger.",
+            name = "Clariva Android",
+            topic = "Clariva is a secure, private and decentralized messenger.",
             alias = RoomAlias("#element-x-android:matrix.org"),
             avatarUrl = null,
             joinRule = RoomDescription.JoinRule.PUBLIC,
@@ -56,8 +56,8 @@ fun aRoomDescriptionList(): ImmutableList<RoomDescription> {
         ),
         RoomDescription(
             roomId = RoomId("!exi:matrix.org"),
-            name = "Element X iOS",
-            topic = "Element X is a secure, private and decentralized messenger.",
+            name = "Clariva iOS",
+            topic = "Clariva is a secure, private and decentralized messenger.",
             alias = RoomAlias("#element-x-ios:matrix.org"),
             avatarUrl = null,
             joinRule = RoomDescription.JoinRule.UNKNOWN,

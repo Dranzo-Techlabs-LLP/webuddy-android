@@ -115,13 +115,11 @@ class OnBoardingPresenter(
                     )
                 }
                 OnBoardingEvents.OnCreateAccount -> localCoroutineScope.launch {
+                    // Only seed the default account provider here. The actual sign-up submission is
+                    // deferred to ConfirmAccountProviderView so the user can pick their role
+                    // (Normal User / Consultant) before the Matrix.org webview opens.
                     val defaultUrl = OnBoardingConfig.DEFAULT_HOMESERVER_URL
                     accountProviderDataSource.setUrl(defaultUrl)
-                    loginHelper.submit(
-                        isAccountCreation = true,
-                        homeserverUrl = defaultUrl,
-                        loginHint = null,
-                    )
                 }
                 OnBoardingEvents.ClearError -> loginHelper.clearError()
                 OnBoardingEvents.OnVersionClick -> {

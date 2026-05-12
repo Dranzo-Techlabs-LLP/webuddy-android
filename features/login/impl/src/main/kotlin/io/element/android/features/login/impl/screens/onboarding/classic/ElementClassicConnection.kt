@@ -214,7 +214,7 @@ class DefaultElementClassicConnection(
 
     private fun Bundle?.toElementClassicConnectionState(): ElementClassicConnectionState {
         return if (this == null) {
-            ElementClassicConnectionState.Error("No data received from Element Classic")
+            ElementClassicConnectionState.Error("No data received from Clariva Classic")
         } else {
             val error = getString(KEY_ERROR_STR)
             if (error != null) {

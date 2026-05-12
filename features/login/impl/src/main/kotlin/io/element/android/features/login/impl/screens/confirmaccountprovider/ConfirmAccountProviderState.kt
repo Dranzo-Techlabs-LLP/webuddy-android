@@ -15,6 +15,7 @@ import io.element.android.libraries.architecture.AsyncData
 data class ConfirmAccountProviderState(
     val accountProvider: AccountProvider,
     val isAccountCreation: Boolean,
+    val isConsultant: Boolean,
     val loginMode: AsyncData<LoginMode>,
     val eventSink: (ConfirmAccountProviderEvents) -> Unit
 ) {

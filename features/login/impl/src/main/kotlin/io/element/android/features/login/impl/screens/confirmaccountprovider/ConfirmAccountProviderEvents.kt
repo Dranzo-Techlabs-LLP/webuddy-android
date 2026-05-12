@@ -11,4 +11,5 @@ package io.element.android.features.login.impl.screens.confirmaccountprovider
 sealed interface ConfirmAccountProviderEvents {
     data object Continue : ConfirmAccountProviderEvents
     data object ClearError : ConfirmAccountProviderEvents
+    data class SelectRole(val isConsultant: Boolean) : ConfirmAccountProviderEvents
 }

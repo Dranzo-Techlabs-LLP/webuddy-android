@@ -79,7 +79,7 @@ class LoginWithClassicPresenter(
                             userId = currentState.userId,
                         )
                     } else {
-                        loginWithClassicAction.value = AsyncAction.Failure(IllegalStateException("Element Classic is not ready"))
+                        loginWithClassicAction.value = AsyncAction.Failure(IllegalStateException("Clariva Classic is not ready"))
                     }
                 }
                 LoginWithClassicEvent.DoLoginWithClassic -> coroutineScope.launch {

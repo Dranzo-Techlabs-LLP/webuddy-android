@@ -146,7 +146,7 @@ private fun RolePickerDialog(
         title = { androidx.compose.material3.Text("Choose your role") },
         text = {
             androidx.compose.material3.Text(
-                "Please tell us how you'll use Webuddy. This decides whether you can initiate paid chats. " +
+                "Please tell us how you'll use Clariva. This decides whether you can initiate paid chats. " +
                     "Consultants receive holds; normal users initiate them."
             )
         },

@@ -16,7 +16,6 @@ import io.element.android.libraries.network.RetrofitFactory
 
 @BindingContainer
 @ContributesTo(AppScope::class)
-@Suppress("unused")
 object WalletModule {
     @Provides
     @SingleIn(AppScope::class)

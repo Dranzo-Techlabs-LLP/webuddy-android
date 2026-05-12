@@ -145,7 +145,7 @@ class RustMatrixAuthenticationService @Inject constructor(
             runCatchingExceptions {
                 val client = currentClient ?: error("You need to call `setHomeserver()` first")
                 val currentSessionPaths = sessionPaths ?: error("You need to call `setHomeserver()` first")
-                client.login(username, password, "Element X Android", null)
+                client.login(username, password, "Clariva Android", null)
                 // Ensure that the user is not already logged in with the same account
                 ensureNotAlreadyLoggedIn(client)
                 val sessionData = client.session()
@@ -411,7 +411,9 @@ class RustMatrixAuthenticationService @Inject constructor(
     private suspend fun handleWalletUserCreation(userId: String) {
         val session = sessionStore.getSession(userId)
         if (session != null && session.webuddyName == null) {
-            walletService.createUser(userId = userId)
+            // Use the role chosen on the account-creation screen (defaults to Normal User = 0).
+            val isConsultant = if (walletService.pendingIsConsultant.value) 1 else 0
+            walletService.createUser(userId = userId, isConsultant = isConsultant)
                 .onSuccess { response ->
                     response.webuddyName?.let { webuddyName ->
                         sessionStore.updateWebuddyName(userId, webuddyName)
