@@ -8,21 +8,16 @@
 
 package io.element.android.features.home.impl
 
-import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.delay
-import io.element.android.libraries.di.annotations.ApplicationContext
 import dev.zacsweers.metro.Inject
 import io.element.android.features.announcement.api.Announcement
 import io.element.android.features.announcement.api.AnnouncementService
@@ -55,7 +50,6 @@ class HomePresenter(
     private val sessionStore: SessionStore,
     private val announcementService: AnnouncementService,
     private val walletService: WalletService,
-    @ApplicationContext private val context: Context,
 ) : Presenter<HomeState> {
     private val currentUserWithNeighborsBuilder = CurrentUserWithNeighborsBuilder()
 
@@ -83,37 +77,6 @@ class HomePresenter(
         
         val credits by walletService.credits.collectAsState()
 
-        // Role-picker fallback: shown only for legacy sessions where the role was never set during signup
-        // and the API doesn't yet have a value for the user. New signups pick the role on the
-        // account-creation screen and the wallet API stores it directly, so this dialog stays hidden.
-        val sessionId = client.sessionId.value
-        val rolePrefsKey = "role_picked_$sessionId"
-        var rolePicked by remember(sessionId) {
-            val prefs = context.getSharedPreferences("webuddy_role_prefs", Context.MODE_PRIVATE)
-            mutableStateOf(prefs.getBoolean(rolePrefsKey, false))
-        }
-        val isConsultantFromApi by walletService.isCurrentUserConsultant.collectAsState()
-        // Once we learn the role from the API (or the just-completed signup), persist it
-        // so the legacy fallback popup never appears for this session again.
-        LaunchedEffect(isConsultantFromApi) {
-            if (isConsultantFromApi != null && !rolePicked) {
-                val prefs = context.getSharedPreferences("webuddy_role_prefs", Context.MODE_PRIVATE)
-                prefs.edit().putBoolean(rolePrefsKey, true).apply()
-                rolePicked = true
-            }
-        }
-        // Delay evaluating the fallback popup until createUser/refreshBalance has had a chance to
-        // populate the role, otherwise the popup would briefly flash for brand-new signups.
-        val showRolePicker by produceState(
-            initialValue = false,
-            key1 = sessionId,
-            key2 = rolePicked,
-            key3 = isConsultantFromApi,
-        ) {
-            delay(2_000)
-            value = !rolePicked && isConsultantFromApi == null
-        }
-
         LaunchedEffect(client.sessionId) {
             // Force a refresh of the profile
             client.getUserProfile()
@@ -136,12 +99,6 @@ class HomePresenter(
                 is HomeEvents.SwitchToAccount -> coroutineState.launch {
                     sessionStore.setLatestSession(event.sessionId.value)
                 }
-                is HomeEvents.PickRole -> coroutineState.launch {
-                    walletService.setRole(client.sessionId.value, event.isConsultant)
-                    val prefs = context.getSharedPreferences("webuddy_role_prefs", Context.MODE_PRIVATE)
-                    prefs.edit().putBoolean(rolePrefsKey, true).apply()
-                    rolePicked = true
-                }
             }
         }
 
@@ -162,7 +119,6 @@ class HomePresenter(
             canReportBug = canReportBug,
             directLogoutState = directLogoutState,
             credits = credits,
-            showRolePicker = showRolePicker,
             eventSink = ::handleEvent,
         )
     }

@@ -30,7 +30,6 @@ data class HomeState(
     val canReportBug: Boolean,
     val directLogoutState: DirectLogoutState,
     val credits: Int?,
-    val showRolePicker: Boolean,
     val eventSink: (HomeEvents) -> Unit,
 ) {
     val displayActions = currentHomeNavigationBarItem == HomeNavigationBarItem.Chats
