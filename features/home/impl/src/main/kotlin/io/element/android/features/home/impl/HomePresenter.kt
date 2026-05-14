@@ -80,8 +80,11 @@ class HomePresenter(
         LaunchedEffect(client.sessionId) {
             // Force a refresh of the profile
             client.getUserProfile()
-            // Fetch wallet balance
+            // Fetch wallet balance — this also resolves isCurrentUserConsultant from the API
             walletService.refreshBalance(client.sessionId.value)
+            // Once we know the role, populate the per-room pending-refund set so the chat list
+            // can render a "Refund requested" badge on rows needing attention. No-op for clients.
+            walletService.refreshPendingRefundRequests(client.sessionId.value)
         }
         
         // Avatar indicator

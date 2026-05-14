@@ -163,52 +163,55 @@ class MessageComposerPresenter(
         val otherUserId = remember(roomInfo, membersState) { membersState.getDirectRoomMember(roomInfo, room.sessionId)?.userId?.value }
 
         val isWalletLoaded = credits != null && recipientMaxCredits != null && holdExists != null
-        val isRestricted = if (otherUserId == null) {
-            // Not a direct chat, no specific recipient to restrict against
-            false
-        } else if (isCurrentUserConsultant == true) {
-            // Consultants are paid by clients; they're never blocked from replying.
-            false
-        } else if (holdExists == true) {
-            // Active hold exists, chat is NOT restricted regardless of balance
-            false
-        } else if (!isWalletLoaded) {
-            // Default to restricted until we have verified all data
-            true
-        } else {
-            // Condition: Sender's current_hold < Receiver's max_credits
-            (credits ?: 0) < (recipientMaxCredits ?: 100)
+        // Don't gate the composer on partial knowledge. The previous logic restricted by default
+        // whenever the role/balance state hadn't loaded yet, which made the "Recharge your wallet"
+        // banner flash on every chat-open for consultants (whose isCurrentUserConsultant flag is
+        // null at first paint, falling through to the loading-default-restricted branch).
+        val isRestricted = when {
+            otherUserId == null -> false
+            isCurrentUserConsultant == true -> false           // confirmed consultant
+            isCurrentUserConsultant == null -> false           // unknown role — don't gate, wait
+            holdExists == true -> false                         // active hold covers the chat
+            !isWalletLoaded -> false                            // confirmed not-consultant, still loading — don't gate
+            else -> (credits ?: 0) < (recipientMaxCredits ?: 100)
         }
 
-        LaunchedEffect(otherUserId) {
+        LaunchedEffect(otherUserId, isCurrentUserConsultant) {
             val myUserId = room.sessionId.value
             walletService.refreshBalance(myUserId)
-            otherUserId?.let {
-                try {
-                    holdExistsState.value = walletService.checkHoldExists(myUserId, it)
-                    recipientMaxCreditsState.value = walletService.getMaxCredits(it)
-                } catch (e: Exception) {
-                    Timber.e(e, "Failed to fetch recipient wallet info")
-                }
-            }
-        }
-
-        LaunchedEffect(isRestricted, otherUserId) {
-            val myUserId = room.sessionId.value
-            // Continuously validate credits in real-time.
-            // When restricted, poll more frequently to quickly detect changes in either sender or receiver wallet.
-            val pollInterval = if (isRestricted) 5.seconds else 15.seconds
-            while (true) {
-                walletService.refreshBalance(myUserId)
+            // Consultants never gate on hold/recipient credits — those values only drive client-side
+            // payment restriction. Calling checkHoldExists with the consultant as clientId is a
+            // role-inverted query that always returns false anyway (the hold's stored clientId is
+            // the OTHER user). Skip it entirely.
+            if (isCurrentUserConsultant != true) {
                 otherUserId?.let {
                     try {
                         holdExistsState.value = walletService.checkHoldExists(myUserId, it)
                         recipientMaxCreditsState.value = walletService.getMaxCredits(it)
                     } catch (e: Exception) {
-                        Timber.e(e, "Failed to refresh recipient wallet info in loop")
+                        Timber.e(e, "Failed to fetch recipient wallet info")
                     }
                 }
-                delay(pollInterval)
+            }
+        }
+
+        LaunchedEffect(otherUserId, isCurrentUserConsultant) {
+            // Periodic refresh for clients only. Consultants are never gated, so polling is wasted
+            // round-trips. Keying on isCurrentUserConsultant (not isRestricted) prevents the loop
+            // restarting on every flicker of the restriction state. 60s is plenty — wallet state
+            // isn't real-time, and the polling was previously starving the MySQL pool at 5s.
+            if (isCurrentUserConsultant != false) return@LaunchedEffect
+            val target = otherUserId ?: return@LaunchedEffect
+            val myUserId = room.sessionId.value
+            while (true) {
+                delay(60.seconds)
+                walletService.refreshBalance(myUserId)
+                try {
+                    holdExistsState.value = walletService.checkHoldExists(myUserId, target)
+                    recipientMaxCreditsState.value = walletService.getMaxCredits(target)
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to refresh recipient wallet info in loop")
+                }
             }
         }
 
@@ -422,11 +425,14 @@ class MessageComposerPresenter(
                         val currentMembersState = room.membersStateFlow.value
                         val currentOtherUserId = currentMembersState.getDirectRoomMember(currentRoomInfo, room.sessionId)?.userId?.value
                         walletService.refreshBalance(myUserId)
-                        currentOtherUserId?.let {
-                            try {
-                                holdExistsState.value = walletService.checkHoldExists(myUserId, it)
-                                recipientMaxCreditsState.value = walletService.getMaxCredits(it)
-                            } catch (e: Exception) { /* ignore */ }
+                        // Skip recipient/hold lookup for consultants — see LaunchedEffect note above.
+                        if (walletService.isCurrentUserConsultant.value != true) {
+                            currentOtherUserId?.let {
+                                try {
+                                    holdExistsState.value = walletService.checkHoldExists(myUserId, it)
+                                    recipientMaxCreditsState.value = walletService.getMaxCredits(it)
+                                } catch (e: Exception) { /* ignore */ }
+                            }
                         }
                     }
                 }
@@ -592,12 +598,15 @@ class MessageComposerPresenter(
         val currentMembersState = room.membersStateFlow.value
         val currentOtherUserId = currentMembersState.getDirectRoomMember(currentRoomInfo, room.sessionId)?.userId?.value
         walletService.refreshBalance(myUserId)
-        currentOtherUserId?.let {
-            sessionCoroutineScope.launch {
-                try {
-                    holdExistsState.value = walletService.checkHoldExists(myUserId, it)
-                    recipientMaxCreditsState.value = walletService.getMaxCredits(it)
-                } catch (e: Exception) { /* ignore */ }
+        // Skip recipient/hold lookup for consultants — see LaunchedEffect note above.
+        if (walletService.isCurrentUserConsultant.value != true) {
+            currentOtherUserId?.let {
+                sessionCoroutineScope.launch {
+                    try {
+                        holdExistsState.value = walletService.checkHoldExists(myUserId, it)
+                        recipientMaxCreditsState.value = walletService.getMaxCredits(it)
+                    } catch (e: Exception) { /* ignore */ }
+                }
             }
         }
     }
@@ -653,11 +662,14 @@ class MessageComposerPresenter(
         val currentMembersState = room.membersStateFlow.value
         val currentOtherUserId = currentMembersState.getDirectRoomMember(currentRoomInfo, room.sessionId)?.userId?.value
         walletService.refreshBalance(myUserId)
-        currentOtherUserId?.let {
-            try {
-                holdExistsState.value = walletService.checkHoldExists(myUserId, it)
-                recipientMaxCreditsState.value = walletService.getMaxCredits(it)
-            } catch (e: Exception) { /* ignore */ }
+        // Skip recipient/hold lookup for consultants — see LaunchedEffect note above.
+        if (walletService.isCurrentUserConsultant.value != true) {
+            currentOtherUserId?.let {
+                try {
+                    holdExistsState.value = walletService.checkHoldExists(myUserId, it)
+                    recipientMaxCreditsState.value = walletService.getMaxCredits(it)
+                } catch (e: Exception) { /* ignore */ }
+            }
         }
     }
         .onFailure { cause ->

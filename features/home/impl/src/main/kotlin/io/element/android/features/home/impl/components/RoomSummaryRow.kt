@@ -24,11 +24,14 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -125,6 +128,7 @@ internal fun RoomSummaryRow(
                         timestamp = room.timestamp,
                         isHighlighted = room.isHighlighted,
                         credits = room.credits,
+                        hasPendingRefundRequest = room.hasPendingRefundRequest,
                     )
                     MessagePreviewAndIndicatorRow(room = room)
                 }
@@ -218,6 +222,7 @@ private fun NameAndTimestampRow(
     timestamp: String?,
     isHighlighted: Boolean,
     credits: Int? = null,
+    hasPendingRefundRequest: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -237,6 +242,10 @@ private fun NameAndTimestampRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            if (hasPendingRefundRequest) {
+                Spacer(modifier = Modifier.width(8.dp))
+                RefundRequestedBadge()
+            }
         }
         Column(horizontalAlignment = Alignment.End) {
             // Timestamp
@@ -404,6 +413,38 @@ private fun InviteNameAndIndicatorRow(
                 color = ElementTheme.colors.unreadIndicator
             )
         }
+    }
+}
+
+/**
+ * Small pill drawn inline with the room name to flag a chat where the other party
+ * has an open refund request awaiting this consultant's decision. Only shown on
+ * consultant accounts (the factory gates the flag on isCurrentUserConsultant).
+ */
+@Composable
+private fun RefundRequestedBadge(
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .background(ElementTheme.colors.bgCriticalSubtle)
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            modifier = Modifier.size(12.dp),
+            imageVector = CompoundIcons.InfoSolid(),
+            contentDescription = null,
+            tint = ElementTheme.colors.textCriticalPrimary,
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+            text = "Refund",
+            style = ElementTheme.typography.fontBodyXsMedium,
+            color = ElementTheme.colors.textCriticalPrimary,
+            maxLines = 1,
+        )
     }
 }
 

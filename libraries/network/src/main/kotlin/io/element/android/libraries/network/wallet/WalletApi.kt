@@ -84,4 +84,14 @@ interface WalletApi {
     suspend fun rejectRefund(
         @Body request: RejectRefundRequest
     ): GenericRefundResponse
+
+    /**
+     * Bulk lookup: which clients currently have an open refund request directed at
+     * [consultantId]? Returns matrix IDs only — the caller already knows which rooms
+     * those map to in the chat list.
+     */
+    @GET("v1/refund/pending-for-consultant")
+    suspend fun pendingRefundsForConsultant(
+        @Query("consultantId") consultantId: String,
+    ): PendingRefundsForConsultantResponse
 }

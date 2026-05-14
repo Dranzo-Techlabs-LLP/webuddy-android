@@ -84,6 +84,7 @@ import io.element.android.libraries.matrix.ui.model.getAvatarData
 import io.element.android.libraries.matrix.ui.room.getDirectRoomMember
 import io.element.android.libraries.recentemojis.api.AddRecentEmoji
 import io.element.android.libraries.textcomposer.model.MessageComposerMode
+import io.element.android.features.messages.impl.R
 import io.element.android.libraries.ui.strings.CommonStrings
 import io.element.android.services.analytics.api.AnalyticsService
 import kotlinx.collections.immutable.toImmutableList
@@ -256,7 +257,7 @@ class MessagesPresenter(
                             // In-app notification for consultants when a new refund request comes in.
                             val reqId = status.refundRequestIdString
                             if (amConsultant && status.refundStatus == "requested" && reqId != null && notifiedRefundRequestIds.add(reqId)) {
-                                snackbarDispatcher.post(SnackbarMessage(CommonStrings.common_success))
+                                snackbarDispatcher.post(SnackbarMessage(R.string.screen_messages_refund_requested_announcement))
                             }
                         } else {
                             Timber.d("[Refund] No active hold; hiding refund UI")
@@ -400,7 +401,10 @@ class MessagesPresenter(
                         result.onSuccess {
                             refundStatus.value = "approved"
                             isRefundButtonVisible.value = false
-                            snackbarDispatcher.post(SnackbarMessage(CommonStrings.common_success))
+                            snackbarDispatcher.post(SnackbarMessage(R.string.screen_messages_refund_approved_announcement))
+                            // Refresh the chat-list pending-refund badge set: this client's
+                            // request is now resolved and should disappear from the list.
+                            walletService.refreshPendingRefundRequests(room.sessionId.value)
                         }.onFailure {
                             snackbarDispatcher.post(SnackbarMessage(CommonStrings.common_error))
                         }
@@ -419,7 +423,10 @@ class MessagesPresenter(
                         val result = walletService.rejectRefund(reqId)
                         result.onSuccess {
                             refundStatus.value = "rejected"
-                            snackbarDispatcher.post(SnackbarMessage(CommonStrings.common_success))
+                            snackbarDispatcher.post(SnackbarMessage(R.string.screen_messages_refund_rejected_announcement))
+                            // Refresh the chat-list pending-refund badge set: this request is
+                            // now in 'rejected' state and should disappear from the list.
+                            walletService.refreshPendingRefundRequests(room.sessionId.value)
                         }.onFailure {
                             snackbarDispatcher.post(SnackbarMessage(CommonStrings.common_error))
                         }

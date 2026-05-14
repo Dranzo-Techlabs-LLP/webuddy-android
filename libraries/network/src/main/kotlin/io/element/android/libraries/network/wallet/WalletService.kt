@@ -44,6 +44,12 @@ class WalletService @Inject constructor(
     private val _pendingIsConsultant = MutableStateFlow(false)
     val pendingIsConsultant: StateFlow<Boolean> = _pendingIsConsultant.asStateFlow()
 
+    // Set of client Matrix IDs that currently have an open refund request awaiting this
+    // consultant's decision. Powers the chat-list refund-pending badge so consultants
+    // can spot affected rooms without opening each chat individually.
+    private val _pendingRefundRequestClients = MutableStateFlow<Set<String>>(emptySet())
+    val pendingRefundRequestClients: StateFlow<Set<String>> = _pendingRefundRequestClients.asStateFlow()
+
     fun setPendingIsConsultant(value: Boolean) {
         Timber.d("Pending isConsultant set to $value")
         _pendingIsConsultant.value = value
@@ -51,6 +57,13 @@ class WalletService @Inject constructor(
 
     private val creditsCache = ConcurrentHashMap<String, Int>()
     private val orderToTransactionMap = ConcurrentHashMap<String, String>()
+
+    // Tracks the last user whose wallet was refreshed, so we can flush stale in-memory state
+    // when the active session changes (logout + login, switch account, etc). Without this,
+    // WalletService is @SingleIn(AppScope) and would leak the previous user's credits/role
+    // into the new user's session until refreshBalance completes — visible as e.g. the home
+    // top-bar momentarily showing the previous account's balance.
+    private var lastRefreshedUserId: String? = null
 
     private val _paymentResults = MutableSharedFlow<WalletPaymentResult>(extraBufferCapacity = 1)
     val paymentResults: SharedFlow<WalletPaymentResult> = _paymentResults.asSharedFlow()
@@ -100,28 +113,48 @@ class WalletService @Inject constructor(
     }
 
     suspend fun refreshBalance(userId: String) {
+        // B6 fix: when the active user changes (account switch / logout+login), flush stale state
+        // before fetching the new user's data. This avoids showing the previous user's credits
+        // and role during the window between login and the new refreshBalance completing.
+        val previousUserId = lastRefreshedUserId
+        if (previousUserId != null && previousUserId != userId) {
+            Timber.d("Active user changed ($previousUserId -> $userId); clearing wallet cache")
+            _credits.value = null
+            _maxCredits.value = null
+            _originalMaxCredits.value = null
+            _isCurrentUserConsultant.value = null
+            _pendingRefundRequestClients.value = emptySet()
+            creditsCache.clear()
+            orderToTransactionMap.clear()
+        }
+        lastRefreshedUserId = userId
+
         try {
             Timber.d("Refreshing balance for user: $userId")
             val sessionData = sessionStore.getSession(userId)
             val identifier = sessionData?.webuddyName ?: userId
             val response = walletApi.getWalletBalance(identifier)
-            
-            val balance = response.currentHold?.let { 
-                it.jsonPrimitive.content.toDoubleOrNull()?.toInt() 
-            } ?: 0
-            _credits.value = balance
 
-            val maxCreditsValue = response.maxCredits?.let {
-                it.jsonPrimitive.content.toDoubleOrNull()?.toInt()
-            } ?: 100
-            _maxCredits.value = maxCreditsValue
-            _originalMaxCredits.value = maxCreditsValue
+            // B4 fix: only overwrite credits/maxCredits on a real parsed value. Previously this
+            // path used `?: 0` / `?: 100` fallbacks that clobbered the last-known-good value
+            // whenever the API returned a null field or an unparseable string.
+            val parsedBalance = response.currentHold
+                ?.jsonPrimitive?.content?.toDoubleOrNull()?.toInt()
+            if (parsedBalance != null) _credits.value = parsedBalance
+
+            val parsedMaxCredits = response.maxCredits
+                ?.jsonPrimitive?.content?.toDoubleOrNull()?.toInt()
+            if (parsedMaxCredits != null) {
+                _maxCredits.value = parsedMaxCredits
+                _originalMaxCredits.value = parsedMaxCredits
+                creditsCache[userId] = parsedMaxCredits
+            }
 
             response.isConsultant?.let { _isCurrentUserConsultant.value = it == 1 }
-
-            creditsCache[userId] = maxCreditsValue
         } catch (e: Exception) {
             Timber.e(e, "Failed to refresh wallet balance for user $userId")
+            // Only seed defaults if we have no value at all; never clobber a known-good value
+            // from a previous successful refresh.
             if (_credits.value == null) _credits.value = 0
             if (_maxCredits.value == null) {
                 _maxCredits.value = 100
@@ -341,6 +374,29 @@ class WalletService @Inject constructor(
         } catch (e: Exception) {
             Timber.e(e, "Failed to approve refund")
             Result.failure(e)
+        }
+    }
+
+    /**
+     * Refresh the set of clients with an open refund request awaiting this consultant.
+     * No-op (and clears the set) if the current user is not a consultant — the chat-list
+     * badge only renders for consultants. Safe to call frequently; one API round-trip.
+     */
+    suspend fun refreshPendingRefundRequests(consultantUserId: String) {
+        if (_isCurrentUserConsultant.value != true) {
+            _pendingRefundRequestClients.value = emptySet()
+            return
+        }
+        try {
+            val sessionData = sessionStore.getSession(consultantUserId)
+            val identifier = sessionData?.webuddyName ?: consultantUserId
+            val response = walletApi.pendingRefundsForConsultant(identifier)
+            _pendingRefundRequestClients.value = response.clientIds.toSet()
+            Timber.d("Pending refund requests for $consultantUserId: ${response.clientIds.size}")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to refresh pending refund requests for $consultantUserId")
+            // On failure, leave the previous value untouched — better to show a stale badge
+            // than to clear correct state because of one network blip.
         }
     }
 

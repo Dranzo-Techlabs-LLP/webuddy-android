@@ -156,3 +156,8 @@ data class RefundResponse(
     @SerialName("success") val success: Boolean,
     @SerialName("message") val message: String? = null
 )
+
+@Serializable
+data class PendingRefundsForConsultantResponse(
+    @SerialName("clientIds") val clientIds: List<String> = emptyList(),
+)

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ Copyright (c) 2026 Element Creations Ltd.
+  ~
+  ~ SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial.
+  ~ Please see LICENSE files in the repository root for full details.
+  -->
+<resources>
+    <!-- Refund flow snackbars. Hand-maintained (not from Localazy). The previous code reused
+         CommonStrings.common_success ("Success") for all three events, which is confusing for
+         the recipient of a refund REQUEST — they haven't done anything successful. -->
+    <string translatable="false" name="screen_messages_refund_requested_announcement">Refund requested by client</string>
+    <string translatable="false" name="screen_messages_refund_approved_announcement">Refund approved</string>
+    <string translatable="false" name="screen_messages_refund_rejected_announcement">Refund rejected</string>
+</resources>

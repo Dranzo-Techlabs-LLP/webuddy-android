@@ -43,6 +43,9 @@ data class RoomListRoomSummary(
     val isSpace: Boolean,
     val credits: Int? = null,
     val heroUserId: UserId? = null,
+    /** True iff the current user is a consultant AND this room's other party has
+     *  an open refund request awaiting decision. Drives the chat-list badge. */
+    val hasPendingRefundRequest: Boolean = false,
 ) {
     val isHighlighted = userDefinedNotificationMode != RoomNotificationMode.MUTE &&
         (numberOfUnreadNotifications > 0 || numberOfUnreadMentions > 0) ||

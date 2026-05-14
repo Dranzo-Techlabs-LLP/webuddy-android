@@ -19,6 +19,7 @@ import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.api.notificationsettings.NotificationSettingsService
 import io.element.android.libraries.matrix.api.roomlist.RoomListService
 import io.element.android.libraries.matrix.api.roomlist.RoomSummary
+import io.element.android.libraries.network.wallet.WalletService
 import io.element.android.services.analytics.api.AnalyticsService
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
@@ -45,10 +46,12 @@ class RoomListDataSource(
     private val sessionCoroutineScope: CoroutineScope,
     private val dateTimeObserver: DateTimeObserver,
     private val analyticsService: AnalyticsService,
+    private val walletService: WalletService,
 ) {
     init {
         observeNotificationSettings()
         observeDateTimeChanges()
+        observePendingRefundRequests()
     }
 
     private val _allRooms = MutableSharedFlow<ImmutableList<RoomListRoomSummary>>(replay = 1)
@@ -95,6 +98,19 @@ class RoomListDataSource(
                     is DateTimeObserver.Event.DateChanged -> rebuildAllRoomSummaries()
                 }
             }
+            .launchIn(sessionCoroutineScope)
+    }
+
+    /**
+     * The room-list diff cache reuses previously-built summaries until something invalidates them.
+     * The set of clients with a pending refund request is read by the factory at build time, so when
+     * the set changes (consultant fetches new state, or approves/rejects a request) we need to rebuild
+     * affected rows to surface or remove the badge. Cheap: only fires when the set actually changes,
+     * and the factory is fast for cached values.
+     */
+    private fun observePendingRefundRequests() {
+        walletService.pendingRefundRequestClients
+            .onEach { rebuildAllRoomSummaries() }
             .launchIn(sessionCoroutineScope)
     }
 

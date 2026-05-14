@@ -41,12 +41,19 @@ class RoomListRoomSummaryFactory(
         Timber.d("Processing room ${roomInfo.name}. Hero: ${heroUserId?.value}")
         
         // Per-row max-credits is a price tag for the consultant; only clients need it. Skip the lookup for consultants.
-        val credits = if (walletService.isCurrentUserConsultant.value == true) {
+        val isConsultant = walletService.isCurrentUserConsultant.value == true
+        val credits = if (isConsultant) {
             null
         } else {
             heroUserId?.let { walletService.getMaxCredits(it.value) }
         }
-        
+
+        // For consultants, mark the row if the other party has an open refund request waiting.
+        // The pending set is populated by HomePresenter on home mount via
+        // walletService.refreshPendingRefundRequests(); we just look it up here (O(1)).
+        val hasPendingRefundRequest = isConsultant && heroUserId != null &&
+            heroUserId.value in walletService.pendingRefundRequestClients.value
+
         return RoomListRoomSummary(
             id = roomSummary.roomId.value,
             roomId = roomSummary.roomId,
@@ -86,7 +93,8 @@ class RoomListRoomSummaryFactory(
             isTombstoned = roomInfo.successorRoom != null,
             isSpace = roomInfo.isSpace,
             heroUserId = heroUserId,
-            credits = credits
+            credits = credits,
+            hasPendingRefundRequest = hasPendingRefundRequest,
         )
     }
 
