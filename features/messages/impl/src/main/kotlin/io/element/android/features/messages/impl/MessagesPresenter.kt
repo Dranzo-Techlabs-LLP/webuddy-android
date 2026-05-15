@@ -89,6 +89,7 @@ import io.element.android.libraries.ui.strings.CommonStrings
 import io.element.android.services.analytics.api.AnalyticsService
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -144,6 +145,12 @@ class MessagesPresenter(
     )
 
     private val markingAsReadAndExiting = AtomicBoolean(false)
+
+    // Chat-local toast channel. Refund-flow snackbars (request sent / approved / rejected / failed)
+    // are emitted here instead of via the global SnackbarDispatcher to keep them confined to the
+    // chat screen — the global queue was leaking messages onto the chat-list scaffold when the
+    // user navigated back before the snackbar had finished displaying.
+    private val chatTransientEvents = MutableSharedFlow<Int>(extraBufferCapacity = 8)
 
     @Composable
     override fun present(): MessagesState {
@@ -254,10 +261,15 @@ class MessagesPresenter(
                             refundRequestId.value = status.refundRequestIdString
                             isRefundButtonVisible.value = true
 
-                            // In-app notification for consultants when a new refund request comes in.
+                            // The in-chat RefundRequestBanner at the top is the consultant's signal
+                            // that a refund needs attention; a separate snackbar here was redundant
+                            // and worse, leaked through the global dispatcher onto the chat list.
+                            // The chat-list-row "Refund" badge handles the home-screen affordance.
+                            // (Field kept for the bidirectional poll's existing dedupe logic if
+                            // we ever decide to re-add a contextual notification.)
                             val reqId = status.refundRequestIdString
-                            if (amConsultant && status.refundStatus == "requested" && reqId != null && notifiedRefundRequestIds.add(reqId)) {
-                                snackbarDispatcher.post(SnackbarMessage(R.string.screen_messages_refund_requested_announcement))
+                            if (amConsultant && status.refundStatus == "requested" && reqId != null) {
+                                notifiedRefundRequestIds.add(reqId)
                             }
                         } else {
                             Timber.d("[Refund] No active hold; hiding refund UI")
@@ -380,9 +392,9 @@ class MessagesPresenter(
                         val result = walletService.requestRefund(room.sessionId.value, partnerId, holdId)
                         result.onSuccess {
                             refundStatus.value = "requested"
-                            snackbarDispatcher.post(SnackbarMessage(CommonStrings.common_success))
+                            chatTransientEvents.tryEmit(R.string.screen_messages_refund_request_sent_announcement)
                         }.onFailure {
-                            snackbarDispatcher.post(SnackbarMessage(CommonStrings.common_error))
+                            chatTransientEvents.tryEmit(CommonStrings.common_error)
                         }
                         isRefundRequestInProgress.value = false
                     }
@@ -401,12 +413,12 @@ class MessagesPresenter(
                         result.onSuccess {
                             refundStatus.value = "approved"
                             isRefundButtonVisible.value = false
-                            snackbarDispatcher.post(SnackbarMessage(R.string.screen_messages_refund_approved_announcement))
+                            chatTransientEvents.tryEmit(R.string.screen_messages_refund_approved_announcement)
                             // Refresh the chat-list pending-refund badge set: this client's
                             // request is now resolved and should disappear from the list.
                             walletService.refreshPendingRefundRequests(room.sessionId.value)
                         }.onFailure {
-                            snackbarDispatcher.post(SnackbarMessage(CommonStrings.common_error))
+                            chatTransientEvents.tryEmit(CommonStrings.common_error)
                         }
                         isRefundRequestInProgress.value = false
                     }
@@ -423,12 +435,12 @@ class MessagesPresenter(
                         val result = walletService.rejectRefund(reqId)
                         result.onSuccess {
                             refundStatus.value = "rejected"
-                            snackbarDispatcher.post(SnackbarMessage(R.string.screen_messages_refund_rejected_announcement))
+                            chatTransientEvents.tryEmit(R.string.screen_messages_refund_rejected_announcement)
                             // Refresh the chat-list pending-refund badge set: this request is
                             // now in 'rejected' state and should disappear from the list.
                             walletService.refreshPendingRefundRequests(room.sessionId.value)
                         }.onFailure {
-                            snackbarDispatcher.post(SnackbarMessage(CommonStrings.common_error))
+                            chatTransientEvents.tryEmit(CommonStrings.common_error)
                         }
                         isRefundRequestInProgress.value = false
                     }
@@ -470,6 +482,7 @@ class MessagesPresenter(
             isRefundButtonVisible = isRefundButtonVisible.value,
             isConsultantInThisRoom = isConsultantInThisRoom.value,
             refundRequestId = refundRequestId.value,
+            chatTransientEvents = chatTransientEvents,
             eventSink = ::handleEvent,
         )
     }

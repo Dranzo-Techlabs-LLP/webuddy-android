@@ -9,6 +9,7 @@
          CommonStrings.common_success ("Success") for all three events, which is confusing for
          the recipient of a refund REQUEST — they haven't done anything successful. -->
     <string translatable="false" name="screen_messages_refund_requested_announcement">Refund requested by client</string>
+    <string translatable="false" name="screen_messages_refund_request_sent_announcement">Refund request sent</string>
     <string translatable="false" name="screen_messages_refund_approved_announcement">Refund approved</string>
     <string translatable="false" name="screen_messages_refund_rejected_announcement">Refund rejected</string>
 </resources>

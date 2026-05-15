@@ -109,6 +109,7 @@ import io.element.android.libraries.designsystem.utils.KeepScreenOn
 import io.element.android.libraries.designsystem.utils.OnLifecycleEvent
 import io.element.android.libraries.designsystem.utils.snackbar.SnackbarHost
 import io.element.android.libraries.designsystem.utils.snackbar.rememberSnackbarHostState
+import androidx.compose.ui.platform.LocalContext
 import io.element.android.libraries.matrix.api.core.EventId
 import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.api.core.UserId
@@ -149,6 +150,18 @@ fun MessagesView(
     HideKeyboardWhenDisposed()
 
     val snackbarHostState = rememberSnackbarHostState(snackbarMessage = state.snackbarMessage)
+
+    // Chat-local snackbar pipe for refund-flow feedback (request sent / approved / rejected /
+    // failed). Bypasses the global SnackbarDispatcher so messages confined to this chat never
+    // surface on the chat-list scaffold when the user navigates back. When this composable is
+    // disposed (back-press, swipe-back), the collector is cancelled and any in-flight snackbar
+    // is dismissed — exactly the behavior we want.
+    val chatLocalContext = LocalContext.current
+    LaunchedEffect(state.chatTransientEvents) {
+        state.chatTransientEvents.collect { stringResId ->
+            snackbarHostState.showSnackbar(chatLocalContext.getString(stringResId))
+        }
+    }
 
     var maxComposerHeightPx by remember { mutableIntStateOf(120) }
 

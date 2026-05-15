@@ -57,6 +57,7 @@ import io.element.android.libraries.textcomposer.model.aTextEditorStateRich
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentSetOf
+import kotlinx.coroutines.flow.MutableSharedFlow
 
 open class MessagesStateProvider : PreviewParameterProvider<MessagesState> {
     override val values: Sequence<MessagesState>
@@ -163,6 +164,7 @@ fun aMessagesState(
     roomMemberModerationState = roomMemberModerationState,
     successorRoom = successorRoom,
     summary = summary,
+    chatTransientEvents = MutableSharedFlow(),
     eventSink = eventSink,
 )
 

@@ -29,6 +29,7 @@ import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.api.encryption.identity.IdentityState
 import io.element.android.libraries.matrix.api.room.tombstone.SuccessorRoom
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.coroutines.flow.SharedFlow
 
 data class MessagesState(
     val roomId: RoomId,
@@ -66,6 +67,13 @@ data class MessagesState(
     val isConsultantInThisRoom: Boolean = false,
     /** Refund request id awaiting consultant decision. Non-null only when refundStatus == "requested". */
     val refundRequestId: String? = null,
+    /**
+     * Chat-local toast events (string-resource ids). Emitted by [MessagesPresenter] for refund
+     * approve / reject / request-sent / request-failed feedback. The chat view shows them on its
+     * own [SnackbarHostState] WITHOUT going through the global [SnackbarDispatcher], so they
+     * never leak to the chat-list screen when the user navigates back quickly.
+     */
+    val chatTransientEvents: SharedFlow<Int>,
     val eventSink: (MessagesEvents) -> Unit
 ) {
     val isTombstoned = successorRoom != null

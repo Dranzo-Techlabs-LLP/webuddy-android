@@ -18,6 +18,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.seconds
 import dev.zacsweers.metro.Inject
 import io.element.android.features.announcement.api.Announcement
 import io.element.android.features.announcement.api.AnnouncementService
@@ -85,6 +87,18 @@ class HomePresenter(
             // Once we know the role, populate the per-room pending-refund set so the chat list
             // can render a "Refund requested" badge on rows needing attention. No-op for clients.
             walletService.refreshPendingRefundRequests(client.sessionId.value)
+        }
+
+        // Keep the chat-list refund badge near-real-time. Until we have push, this polls the bulk
+        // pending-for-consultant endpoint at a steady interval so a new request from a client lands
+        // on the consultant's chat list within seconds — not "next time you reopen the app." The
+        // WalletService method short-circuits to a no-op when the user is not a consultant, so
+        // running the loop unconditionally is safe.
+        LaunchedEffect(client.sessionId) {
+            while (true) {
+                delay(8.seconds)
+                walletService.refreshPendingRefundRequests(client.sessionId.value)
+            }
         }
         
         // Avatar indicator
