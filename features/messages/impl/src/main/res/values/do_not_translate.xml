@@ -16,4 +16,8 @@
          consultant's homeserver-driven push pipeline (Sygnal → FCM) delivers a notification
          like a normal chat message — also leaves an audit row in chat history. -->
     <string translatable="false" name="screen_messages_refund_request_chat_notification">🔔 Refund requested for the held credits</string>
+    <!-- Same trick for the consultant's decision: dropping a Matrix message into the room makes
+         the client's homeserver push the outcome to their device even when the app is closed. -->
+    <string translatable="false" name="screen_messages_refund_approved_chat_notification">✅ Your refund was approved — credits returned to your wallet</string>
+    <string translatable="false" name="screen_messages_refund_rejected_chat_notification">❌ Your refund was rejected by the consultant</string>
 </resources>

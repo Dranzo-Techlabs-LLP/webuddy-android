@@ -147,11 +147,14 @@ class MessagesPresenter(
     private val markingAsReadAndExiting = AtomicBoolean(false)
 
     private companion object {
-        // Body of the m.room.message we drop into the room when a refund is requested, so the
-        // consultant's existing Matrix push pipeline (homeserver → Sygnal → FCM) delivers a
-        // notification — even when the app is backgrounded or killed. Mirrors the value of
-        // R.string.screen_messages_refund_request_chat_notification (translatable="false").
+        // Bodies of the m.room.message we drop into the room at each refund lifecycle step, so
+        // the *other* party's existing Matrix push pipeline (homeserver → Sygnal → FCM) delivers
+        // a notification — even when their app is backgrounded or killed. Each mirrors a
+        // translatable="false" string in do_not_translate.xml; kept as constants here to avoid
+        // threading a Context through MessagesPresenter's AssistedFactory just for three strings.
         private const val REFUND_REQUEST_CHAT_NOTIFICATION_BODY = "🔔 Refund requested for the held credits"
+        private const val REFUND_APPROVED_CHAT_NOTIFICATION_BODY = "✅ Your refund was approved — credits returned to your wallet"
+        private const val REFUND_REJECTED_CHAT_NOTIFICATION_BODY = "❌ Your refund was rejected by the consultant"
     }
 
     // Chat-local toast channel. Refund-flow snackbars (request sent / approved / rejected / failed)
@@ -448,6 +451,22 @@ class MessagesPresenter(
                             // Refresh the chat-list pending-refund badge set: this client's
                             // request is now resolved and should disappear from the list.
                             walletService.refreshPendingRefundRequests(room.sessionId.value)
+                            // Mirror of the RequestRefund path: drop a Matrix message into the
+                            // room so the *client's* homeserver → Sygnal → FCM pipeline pushes
+                            // the approval outcome to their device even when the app is closed.
+                            // Best-effort: failure here doesn't roll back the refund — the
+                            // returned credits are already in the client's wallet, and the
+                            // existing 15s status poll / chat-list refresh will surface the
+                            // change next time the client opens the app.
+                            runCatchingExceptions {
+                                room.liveTimeline.sendMessage(
+                                    body = REFUND_APPROVED_CHAT_NOTIFICATION_BODY,
+                                    htmlBody = null,
+                                    intentionalMentions = emptyList(),
+                                )
+                            }.onFailure { e ->
+                                Timber.w(e, "[Refund] Failed to post Matrix notification on approve; client push skipped")
+                            }
                         }.onFailure {
                             chatTransientEvents.tryEmit(CommonStrings.common_error)
                         }
@@ -470,6 +489,19 @@ class MessagesPresenter(
                             // Refresh the chat-list pending-refund badge set: this request is
                             // now in 'rejected' state and should disappear from the list.
                             walletService.refreshPendingRefundRequests(room.sessionId.value)
+                            // Same trick as the approve path — notify the client that their
+                            // refund was declined. Best-effort, no rollback on send failure;
+                            // the backend has already moved the request to 'rejected' and the
+                            // client's 15s poll will pick it up regardless.
+                            runCatchingExceptions {
+                                room.liveTimeline.sendMessage(
+                                    body = REFUND_REJECTED_CHAT_NOTIFICATION_BODY,
+                                    htmlBody = null,
+                                    intentionalMentions = emptyList(),
+                                )
+                            }.onFailure { e ->
+                                Timber.w(e, "[Refund] Failed to post Matrix notification on reject; client push skipped")
+                            }
                         }.onFailure {
                             chatTransientEvents.tryEmit(CommonStrings.common_error)
                         }
