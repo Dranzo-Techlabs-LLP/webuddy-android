@@ -151,10 +151,18 @@ data class RefundRequest(
     @SerialName("pendingHoldId") val pendingHoldId: String
 )
 
+/**
+ * Response from `POST /v1/refund/request`. The server returns
+ * `{ message, refundRequestId }` — there is NO `success` field. Marking `success`
+ * as a required non-nullable Boolean previously made every successful refund-request
+ * deserialise into a `MissingFieldException`, which the catch handler turned into
+ * Result.failure → "Error" snackbar even though the row had been inserted server-side.
+ * All fields are optional; presence of [message] indicates a non-error response.
+ */
 @Serializable
 data class RefundResponse(
-    @SerialName("success") val success: Boolean,
-    @SerialName("message") val message: String? = null
+    @SerialName("message") val message: String? = null,
+    @SerialName("refundRequestId") val refundRequestId: Int? = null,
 )
 
 @Serializable

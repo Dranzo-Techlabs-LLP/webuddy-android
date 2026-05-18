@@ -40,17 +40,16 @@ class RoomListRoomSummaryFactory(
         
         Timber.d("Processing room ${roomInfo.name}. Hero: ${heroUserId?.value}")
         
-        // Per-row max-credits is a price tag for the consultant; only clients need it. Skip the lookup for consultants.
-        val isConsultant = walletService.isCurrentUserConsultant.value == true
-        val credits = if (isConsultant) {
-            null
-        } else {
-            heroUserId?.let { walletService.getMaxCredits(it.value) }
-        }
+        // Per-row max-credits is the chat partner's rate. It only makes sense to display when the
+        // OTHER party is a consultant — clients don't have a chat rate. This holds regardless of
+        // whether the local user is a client (sees what they'll pay) or a consultant (sees the
+        // peer consultant's rate, which is a no-op for self-billing).
+        val credits = heroUserId?.let { walletService.getRecipientChatRate(it.value) }
 
         // For consultants, mark the row if the other party has an open refund request waiting.
         // The pending set is populated by HomePresenter on home mount via
         // walletService.refreshPendingRefundRequests(); we just look it up here (O(1)).
+        val isConsultant = walletService.isCurrentUserConsultant.value == true
         val hasPendingRefundRequest = isConsultant && heroUserId != null &&
             heroUserId.value in walletService.pendingRefundRequestClients.value
 

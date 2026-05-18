@@ -56,6 +56,10 @@ class WalletService @Inject constructor(
     }
 
     private val creditsCache = ConcurrentHashMap<String, Int>()
+    // Per-user isConsultant cache populated as a side-effect of getMaxCredits. Used by the
+    // chat-list factory to decide whether to render the "X credits" per-row rate: only a
+    // consultant has a chat rate; for client-to-client rooms the row stays blank.
+    private val isConsultantCache = ConcurrentHashMap<String, Boolean>()
     private val orderToTransactionMap = ConcurrentHashMap<String, String>()
 
     // Tracks the last user whose wallet was refreshed, so we can flush stale in-memory state
@@ -125,6 +129,7 @@ class WalletService @Inject constructor(
             _isCurrentUserConsultant.value = null
             _pendingRefundRequestClients.value = emptySet()
             creditsCache.clear()
+            isConsultantCache.clear()
             orderToTransactionMap.clear()
         }
         lastRefreshedUserId = userId
@@ -163,29 +168,49 @@ class WalletService @Inject constructor(
         }
     }
 
+    /**
+     * Fetch the wallet info for [userId] — which may be a different user than the locally
+     * logged-in account. Populates [creditsCache] (max_credits) and [isConsultantCache]
+     * (whether that user is a consultant) as side effects.
+     *
+     * Note: this MUST NOT touch [_maxCredits] / [_originalMaxCredits] — those state flows
+     * track the LOCAL user's own settings and are owned by [refreshBalance] / [setMaxCredits] /
+     * [updateMaxCredits]. The previous implementation wrote every queried recipient's
+     * max_credits into the local state, which corrupted the consultant's own rate every time
+     * the chat-list factory looked up a chat partner.
+     */
     suspend fun getMaxCredits(userId: String): Int? {
-        creditsCache[userId]?.let { 
+        creditsCache[userId]?.let {
             Timber.d("Returning cached credits for $userId: $it")
-            return it 
+            return it
         }
         return try {
             Timber.d("Fetching max credits from API for user: $userId")
             val sessionData = sessionStore.getSession(userId)
             val identifier = sessionData?.webuddyName ?: userId
             val response = walletApi.getWalletBalance(identifier)
-            val maxCreditsValue = response.maxCredits?.let { 
-                it.jsonPrimitive.content.toDoubleOrNull()?.toInt() 
-            }
+            val maxCreditsValue = response.maxCredits
+                ?.jsonPrimitive?.content?.toDoubleOrNull()?.toInt()
             if (maxCreditsValue != null) {
                 creditsCache[userId] = maxCreditsValue
-                _maxCredits.value = maxCreditsValue
-                _originalMaxCredits.value = maxCreditsValue
             }
+            response.isConsultant?.let { isConsultantCache[userId] = it == 1 }
             maxCreditsValue
         } catch (e: Exception) {
             Timber.e(e, "Failed to get max credits for user $userId. Error: ${e.message}")
             null
         }
+    }
+
+    /**
+     * Returns [userId]'s chat rate (their max_credits) ONLY if they are a consultant.
+     * For clients (or unknown role), returns null — clients don't have a rate, so the
+     * chat-list row stays blank rather than showing a meaningless number.
+     */
+    suspend fun getRecipientChatRate(userId: String): Int? {
+        // Make sure both caches are populated. getMaxCredits is a cache-first lookup.
+        val maxCredits = getMaxCredits(userId)
+        return if (isConsultantCache[userId] == true) maxCredits else null
     }
 
     fun setMaxCredits(maxCredits: Int) {
