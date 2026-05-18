@@ -12,4 +12,8 @@
     <string translatable="false" name="screen_messages_refund_request_sent_announcement">Refund request sent</string>
     <string translatable="false" name="screen_messages_refund_approved_announcement">Refund approved</string>
     <string translatable="false" name="screen_messages_refund_rejected_announcement">Refund rejected</string>
+    <!-- Body of the Matrix message we drop into the room on a refund request, purely so the
+         consultant's homeserver-driven push pipeline (Sygnal → FCM) delivers a notification
+         like a normal chat message — also leaves an audit row in chat history. -->
+    <string translatable="false" name="screen_messages_refund_request_chat_notification">🔔 Refund requested for the held credits</string>
 </resources>

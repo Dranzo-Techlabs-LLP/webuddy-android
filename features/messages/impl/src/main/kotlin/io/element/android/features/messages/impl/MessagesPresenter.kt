@@ -146,6 +146,14 @@ class MessagesPresenter(
 
     private val markingAsReadAndExiting = AtomicBoolean(false)
 
+    private companion object {
+        // Body of the m.room.message we drop into the room when a refund is requested, so the
+        // consultant's existing Matrix push pipeline (homeserver → Sygnal → FCM) delivers a
+        // notification — even when the app is backgrounded or killed. Mirrors the value of
+        // R.string.screen_messages_refund_request_chat_notification (translatable="false").
+        private const val REFUND_REQUEST_CHAT_NOTIFICATION_BODY = "🔔 Refund requested for the held credits"
+    }
+
     // Chat-local toast channel. Refund-flow snackbars (request sent / approved / rejected / failed)
     // are emitted here instead of via the global SnackbarDispatcher to keep them confined to the
     // chat screen — the global queue was leaking messages onto the chat-list scaffold when the
@@ -393,6 +401,29 @@ class MessagesPresenter(
                         result.onSuccess {
                             refundStatus.value = "requested"
                             chatTransientEvents.tryEmit(R.string.screen_messages_refund_request_sent_announcement)
+                            // Post a normal m.room.message into the room so the consultant gets a
+                            // push notification through the existing Matrix homeserver → Sygnal → FCM
+                            // pipeline — the same path used for regular chat messages, so it works
+                            // when the app is backgrounded or killed. The body is intentionally short
+                            // and prefixed with a bell so it's easy to recognise in the notification
+                            // tray and in chat history (which doubles as a refund audit trail).
+                            // Best-effort: if the Matrix send fails we don't roll the refund back —
+                            // the consultant will still see the in-app banner / chat-list badge the
+                            // next time they open the app, and the snackbar above already confirmed
+                            // the refund request itself succeeded on the wallet backend.
+                            runCatchingExceptions {
+                                // Hardcoded to mirror the value of
+                                // R.string.screen_messages_refund_request_chat_notification
+                                // (which is translatable="false"). Avoids threading a Context
+                                // through MessagesPresenter's AssistedFactory just for one string.
+                                room.liveTimeline.sendMessage(
+                                    body = REFUND_REQUEST_CHAT_NOTIFICATION_BODY,
+                                    htmlBody = null,
+                                    intentionalMentions = emptyList(),
+                                )
+                            }.onFailure { e ->
+                                Timber.w(e, "[Refund] Failed to post Matrix notification message; consultant push skipped")
+                            }
                         }.onFailure {
                             chatTransientEvents.tryEmit(CommonStrings.common_error)
                         }
