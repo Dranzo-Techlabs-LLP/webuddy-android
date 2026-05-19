@@ -435,6 +435,30 @@ class WalletService @Inject constructor(
             Result.failure(e)
         }
     }
+
+    /**
+     * Try to atomically claim the right to post the in-room Matrix push-notification
+     * message for an auto-approved refund.
+     *
+     * Returns `true` if THIS device won the claim and should send the message. Returns
+     * `false` if another device already claimed it (do not send, the room is covered)
+     * OR if the network call failed (do not send to avoid duplicates on retry).
+     */
+    suspend fun claimAutoApprovalNotification(refundRequestId: Int, callerUserId: String): Boolean {
+        return try {
+            val sessionData = sessionStore.getSession(callerUserId)
+            val identifier = sessionData?.webuddyName ?: callerUserId
+            val response = walletApi.claimAutoApprovalNotification(
+                refundRequestId = refundRequestId.toString(),
+                request = ClaimAutoApprovalRequest(userId = identifier),
+            )
+            Timber.d("Auto-approval claim for $refundRequestId by $callerUserId: claimed=${response.claimed}")
+            response.claimed
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to claim auto-approval notification for $refundRequestId; skipping send")
+            false
+        }
+    }
 }
 
 sealed class WalletPaymentResult {

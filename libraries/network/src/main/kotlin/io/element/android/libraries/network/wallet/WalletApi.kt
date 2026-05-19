@@ -94,4 +94,17 @@ interface WalletApi {
     suspend fun pendingRefundsForConsultant(
         @Query("consultantId") consultantId: String,
     ): PendingRefundsForConsultantResponse
+
+    /**
+     * Atomic claim for the in-room Matrix push-notification on an auto-approved refund.
+     * Server returns `{ claimed: true }` exactly once across all callers — the first
+     * app to claim wins the right to post the m.room.message; later calls return
+     * `{ claimed: false }` and the caller MUST skip the send so the room doesn't get
+     * duplicate notifications.
+     */
+    @POST("v1/refund/auto-approval-claim/{id}")
+    suspend fun claimAutoApprovalNotification(
+        @Path("id") refundRequestId: String,
+        @Body request: ClaimAutoApprovalRequest,
+    ): ClaimAutoApprovalResponse
 }

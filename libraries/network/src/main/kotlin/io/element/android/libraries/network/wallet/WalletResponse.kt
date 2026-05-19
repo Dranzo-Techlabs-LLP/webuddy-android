@@ -108,6 +108,14 @@ data class PendingHoldStatusResponse(
     @SerialName("clientId") val clientId: String? = null,
     @SerialName("consultantId") val consultantId: String? = null,
     @SerialName("refundRequestId") val refundRequestId: JsonElement? = null,
+    /**
+     * Set when the consultant didn't respond to a refund request within 24h and the
+     * server's cron auto-approved it. The first app to see this calls
+     * POST /v1/refund/auto-approval-claim/:id to atomically claim the right to post
+     * the in-room Matrix m.room.message — which triggers the other party's push
+     * notification. Null when there's nothing to announce.
+     */
+    @SerialName("pendingAutoApprovalNotification") val pendingAutoApprovalNotification: PendingAutoApprovalNotification? = null,
 ) {
     val holdIdString: String? get() {
         val element = pendingHoldId ?: id ?: return null
@@ -126,6 +134,24 @@ data class PendingHoldStatusResponse(
         }
     }
 }
+
+@Serializable
+data class PendingAutoApprovalNotification(
+    @SerialName("refundRequestId") val refundRequestId: Int,
+    @SerialName("amount") val amount: Double,
+    @SerialName("clientId") val clientId: String,
+    @SerialName("consultantId") val consultantId: String,
+)
+
+@Serializable
+data class ClaimAutoApprovalRequest(
+    @SerialName("userId") val userId: String,
+)
+
+@Serializable
+data class ClaimAutoApprovalResponse(
+    @SerialName("claimed") val claimed: Boolean,
+)
 
 @Serializable
 data class ApproveRefundRequest(

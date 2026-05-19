@@ -155,6 +155,10 @@ class MessagesPresenter(
         private const val REFUND_REQUEST_CHAT_NOTIFICATION_BODY = "🔔 Refund requested for the held credits"
         private const val REFUND_APPROVED_CHAT_NOTIFICATION_BODY = "✅ Your refund was approved — credits returned to your wallet"
         private const val REFUND_REJECTED_CHAT_NOTIFICATION_BODY = "❌ Your refund was rejected by the consultant"
+        // Posted when the server's 24h cron auto-approves an unattended refund. Reads naturally
+        // for either reader: the client sees "your refund was auto-approved", the consultant
+        // sees "the refund went through automatically because they didn't act in time".
+        private const val REFUND_AUTO_APPROVED_CHAT_NOTIFICATION_BODY = "⚙️ Refund auto-approved after 24h with no response — credits returned to the client"
     }
 
     // Chat-local toast channel. Refund-flow snackbars (request sent / approved / rejected / failed)
@@ -288,6 +292,48 @@ class MessagesPresenter(
                             refundStatus.value = null
                             pendingHoldId.value = null
                             refundRequestId.value = null
+                        }
+
+                        // Auto-approval push-notification pickup: when the cron auto-approves an
+                        // unattended refund it sets RefundRequest.notification_sent=0 and the
+                        // backend surfaces it here. The first app to call
+                        // POST /v1/refund/auto-approval-claim/:id wins the right to drop a
+                        // Matrix m.room.message into the room — which then push-notifies the
+                        // OTHER party via the existing homeserver → Sygnal → FCM pipeline.
+                        // The party that "wins" already has the chat open so doesn't need the
+                        // push; the other party (likely app-closed) gets it like any other chat
+                        // message. Best-effort throughout: claim failure or Matrix send failure
+                        // do not roll back the refund itself — credits are already returned.
+                        val pendingNotif = status.pendingAutoApprovalNotification
+                        if (pendingNotif != null) {
+                            val refundIdStr = pendingNotif.refundRequestId.toString()
+                            if (!notifiedRefundRequestIds.contains(refundIdStr)) {
+                                // Local dedupe first so we don't pound the claim endpoint on every
+                                // 15s tick if the server's eventual-consistency window is wide.
+                                notifiedRefundRequestIds.add(refundIdStr)
+                                runCatchingExceptions {
+                                    val claimed = walletService.claimAutoApprovalNotification(
+                                        refundRequestId = pendingNotif.refundRequestId,
+                                        callerUserId = myUserId,
+                                    )
+                                    if (claimed) {
+                                        // We won the claim — drop the in-room notification message.
+                                        // Body matches REFUND_AUTO_APPROVED_CHAT_NOTIFICATION_BODY
+                                        // (companion object below) so it reads naturally in chat
+                                        // history and on the push lockscreen preview.
+                                        room.liveTimeline.sendMessage(
+                                            body = REFUND_AUTO_APPROVED_CHAT_NOTIFICATION_BODY,
+                                            htmlBody = null,
+                                            intentionalMentions = emptyList(),
+                                        )
+                                        Timber.d("[Refund] Posted auto-approval Matrix message for refund $refundIdStr")
+                                    } else {
+                                        Timber.d("[Refund] Auto-approval claim lost for refund $refundIdStr (other side announced)")
+                                    }
+                                }.onFailure { e ->
+                                    Timber.w(e, "[Refund] Auto-approval notification flow failed for $refundIdStr")
+                                }
+                            }
                         }
                     } catch (e: Exception) {
                         Timber.e(e, "[Refund] Failed to get pending hold status for $partnerId")
