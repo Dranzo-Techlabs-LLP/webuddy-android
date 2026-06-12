@@ -7,6 +7,8 @@
 
 package io.element.android.libraries.network.wallet
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -20,10 +22,16 @@ data class WalletResponse(
     @SerialName("isConsultant") val isConsultant: Int? = null,
 )
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class WalletCreateRequest(
     @SerialName("name") val name: String,
     @SerialName("Webuddy_name") val webuddyName: String,
+    // The backend's create-user endpoint validates isConsultant as REQUIRED and "must be 0 or 1".
+    // kotlinx-serialization skips fields equal to their default value during JSON encoding by default,
+    // so a normal user (isConsultant = 0) would have this field dropped → backend 400. EncodeDefault
+    // forces emission so the field is always present in the request body.
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     @SerialName("isConsultant") val isConsultant: Int = 0,
 )
 

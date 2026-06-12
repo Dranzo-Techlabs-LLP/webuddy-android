@@ -92,6 +92,25 @@ android {
             storeFile = file("./signature/debug.keystore")
             storePassword = "android"
         }
+        // Production upload signing for the Play Store release AAB. Credentials are read from
+        // Gradle properties (e.g. ~/.gradle/gradle.properties) or environment variables so that
+        // neither the keystore nor its passwords are ever committed. Required properties:
+        //   clariva.release.storeFile, clariva.release.storePassword,
+        //   clariva.release.keyAlias,  clariva.release.keyPassword
+        // (or env: CLARIVA_RELEASE_STORE_FILE / _STORE_PASSWORD / _KEY_ALIAS / _KEY_PASSWORD)
+        register("release") {
+            val storePath = (project.findProperty("clariva.release.storeFile") as String?)
+                ?: System.getenv("CLARIVA_RELEASE_STORE_FILE")
+            if (!storePath.isNullOrBlank()) {
+                storeFile = file(storePath)
+                storePassword = (project.findProperty("clariva.release.storePassword") as String?)
+                    ?: System.getenv("CLARIVA_RELEASE_STORE_PASSWORD")
+                keyAlias = (project.findProperty("clariva.release.keyAlias") as String?)
+                    ?: System.getenv("CLARIVA_RELEASE_KEY_ALIAS")
+                keyPassword = (project.findProperty("clariva.release.keyPassword") as String?)
+                    ?: System.getenv("CLARIVA_RELEASE_KEY_PASSWORD")
+            }
+        }
         register("nightly") {
             keyAlias = System.getenv("ELEMENT_ANDROID_NIGHTLY_KEYID")
                 ?: project.property("signing.element.nightly.keyId") as? String?
@@ -127,7 +146,21 @@ android {
                 "login_redirect_scheme",
                 oidcRedirectSchemeBase,
             )
-            signingConfig = signingConfigs.getByName("debug")
+            // Use the production upload keystore when its credentials are provided via Gradle
+            // properties / env vars (see signingConfigs.release above). Fall back to the debug
+            // keystore only when they're absent, so local release builds still work — but a
+            // debug-signed AAB will be REJECTED by the Play Store. For a Play upload you MUST
+            // provide the release credentials.
+            val releaseSigning = signingConfigs.getByName("release")
+            signingConfig = if (releaseSigning.storeFile != null) {
+                releaseSigning
+            } else {
+                logger.warnInBox(
+                    "No release keystore configured (clariva.release.* properties missing) — " +
+                        "falling back to DEBUG signing. This AAB/APK CANNOT be uploaded to Play."
+                )
+                signingConfigs.getByName("debug")
+            }
 
             optimization {
                 enable = true

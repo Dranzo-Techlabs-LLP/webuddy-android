@@ -408,17 +408,29 @@ class RustMatrixAuthenticationService @Inject constructor(
         } ?: Timber.w("Timed out waiting for a known verification status")
     }
 
+    /**
+     * After a successful Matrix login / signup, ensure the corresponding wallet user
+     * record exists on our backend. Delegates to [WalletService.ensureWalletUserExists]
+     * so the same idempotent create-or-recover path is used here as on the wallet
+     * screen's own self-heal path — one source of truth.
+     *
+     * Historically this method called createUser directly with an [onSuccess]-only
+     * handler, which silently swallowed every failure. A defect in
+     * [WalletCreateRequest] (isConsultant being dropped from the JSON for the default
+     * value 0) made the backend reject every Normal-User sign-up with HTTP 400 — and
+     * because there was no [onFailure] branch, the user proceeded with no wallet
+     * record and every wallet operation later 404'd as "User not found". The
+     * serialization defect is fixed in WalletResponse.kt; this method is now also
+     * loud about failures so the next regression of this kind is detectable.
+     */
     private suspend fun handleWalletUserCreation(userId: String) {
-        val session = sessionStore.getSession(userId)
-        if (session != null && session.webuddyName == null) {
-            // Use the role chosen on the account-creation screen (defaults to Normal User = 0).
-            val isConsultant = if (walletService.pendingIsConsultant.value) 1 else 0
-            walletService.createUser(userId = userId, isConsultant = isConsultant)
-                .onSuccess { response ->
-                    response.webuddyName?.let { webuddyName ->
-                        sessionStore.updateWebuddyName(userId, webuddyName)
-                    }
-                }
+        val created = walletService.ensureWalletUserExists(userId)
+        if (!created) {
+            Timber.w(
+                "handleWalletUserCreation: wallet user not provisioned for $userId after login. " +
+                    "The user can still use chat features; wallet operations will self-heal via " +
+                    "WalletService's 404-retry path on first wallet API call."
+            )
         }
     }
 }

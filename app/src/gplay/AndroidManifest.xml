@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  ~ Copyright (c) 2025 Dranzo Techlabs LLP.
+  ~
+  ~ SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial.
+  -->
+<!--
+  Google Play–only manifest override.
+
+  We strip REQUEST_INSTALL_PACKAGES from the AAB uploaded to Play because
+  Play reviewers heavily scrutinise this permission. The only code path
+  that used it was opening APK *attachments* inside chats — every other
+  attachment type (PDF, DOC, DOCX, XLS, images, video, audio, ZIP, etc.)
+  is opened via Intent.ACTION_VIEW which needs no special permission, so
+  removing this permission has zero effect on those file types.
+
+  See: libraries/mediaviewer/impl/src/main/kotlin/.../AndroidLocalMediaActions.kt
+       — the .apk branch falls back to openFile() automatically when the
+       permission is absent, so APK attachments still go through the
+       system "Open with…" picker; they just can't be installed in-app.
+
+  The fdroid flavour keeps the permission via the main manifest, since
+  F-Droid users typically expect sideload-style flows.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission
+        android:name="android.permission.REQUEST_INSTALL_PACKAGES"
+        tools:node="remove" />
+
+</manifest>

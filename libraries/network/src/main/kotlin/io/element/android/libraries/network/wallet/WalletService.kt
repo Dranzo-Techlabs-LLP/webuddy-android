@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.jsonPrimitive
+import retrofit2.HttpException
 import timber.log.Timber
 import java.util.concurrent.ConcurrentHashMap
 
@@ -116,6 +117,33 @@ class WalletService @Inject constructor(
         }
     }
 
+    /**
+     * Ensure the wallet backend has a user record for [userId]. Self-healing entry point
+     * used by wallet operations to recover from "User not found" 404s — e.g. when the
+     * initial sign-up's createUser silently failed (network blip, race) and the user has
+     * been operating without a wallet account ever since.
+     *
+     * Safe to call multiple times. If the local session already has a webuddyName, this
+     * is a no-op. Otherwise calls [createUser]; any failure (including the backend already
+     * having the user) is logged but not propagated — the caller will retry the original
+     * operation regardless.
+     */
+    suspend fun ensureWalletUserExists(userId: String): Boolean {
+        val session = sessionStore.getSession(userId)
+        if (session?.webuddyName != null) {
+            return true
+        }
+        val isConsultant = if (_pendingIsConsultant.value) 1 else 0
+        Timber.w("ensureWalletUserExists: no local webuddyName for $userId; attempting createUser")
+        return createUser(userId = userId, isConsultant = isConsultant).fold(
+            onSuccess = { true },
+            onFailure = { e ->
+                Timber.w(e, "ensureWalletUserExists: createUser failed for $userId (may already exist on backend)")
+                false
+            }
+        )
+    }
+
     suspend fun refreshBalance(userId: String) {
         // B6 fix: when the active user changes (account switch / logout+login), flush stale state
         // before fetching the new user's data. This avoids showing the previous user's credits
@@ -136,35 +164,63 @@ class WalletService @Inject constructor(
 
         try {
             Timber.d("Refreshing balance for user: $userId")
-            val sessionData = sessionStore.getSession(userId)
-            val identifier = sessionData?.webuddyName ?: userId
-            val response = walletApi.getWalletBalance(identifier)
-
-            // B4 fix: only overwrite credits/maxCredits on a real parsed value. Previously this
-            // path used `?: 0` / `?: 100` fallbacks that clobbered the last-known-good value
-            // whenever the API returned a null field or an unparseable string.
-            val parsedBalance = response.currentHold
-                ?.jsonPrimitive?.content?.toDoubleOrNull()?.toInt()
-            if (parsedBalance != null) _credits.value = parsedBalance
-
-            val parsedMaxCredits = response.maxCredits
-                ?.jsonPrimitive?.content?.toDoubleOrNull()?.toInt()
-            if (parsedMaxCredits != null) {
-                _maxCredits.value = parsedMaxCredits
-                _originalMaxCredits.value = parsedMaxCredits
-                creditsCache[userId] = parsedMaxCredits
+            applyBalanceResponse(userId, fetchWalletBalance(userId))
+        } catch (e: HttpException) {
+            if (e.code() == 404) {
+                // Same self-heal as createOrder/getTransactionHistory: missing wallet record
+                // on the backend. Without recovery here, the wallet screen sticks on default
+                // balance forever and recharge would also 404 until something else triggers
+                // ensureWalletUserExists.
+                Timber.w("refreshBalance: 404 'User not found' for $userId — auto-creating wallet user and retrying once")
+                ensureWalletUserExists(userId)
+                try {
+                    applyBalanceResponse(userId, fetchWalletBalance(userId))
+                } catch (retryErr: Exception) {
+                    Timber.e(retryErr, "Refresh balance retry failed for $userId after auto-create")
+                    seedDefaultBalanceIfEmpty()
+                }
+            } else {
+                Timber.e(e, "Failed to refresh wallet balance for user $userId")
+                seedDefaultBalanceIfEmpty()
             }
-
-            response.isConsultant?.let { _isCurrentUserConsultant.value = it == 1 }
         } catch (e: Exception) {
             Timber.e(e, "Failed to refresh wallet balance for user $userId")
-            // Only seed defaults if we have no value at all; never clobber a known-good value
-            // from a previous successful refresh.
-            if (_credits.value == null) _credits.value = 0
-            if (_maxCredits.value == null) {
-                _maxCredits.value = 100
-                _originalMaxCredits.value = 100
-            }
+            seedDefaultBalanceIfEmpty()
+        }
+    }
+
+    private suspend fun fetchWalletBalance(userId: String): WalletResponse {
+        val sessionData = sessionStore.getSession(userId)
+        val identifier = sessionData?.webuddyName ?: userId
+        return walletApi.getWalletBalance(identifier)
+    }
+
+    private fun applyBalanceResponse(userId: String, response: WalletResponse) {
+        // B4 fix: only overwrite credits/maxCredits on a real parsed value. Previously this
+        // path used `?: 0` / `?: 100` fallbacks that clobbered the last-known-good value
+        // whenever the API returned a null field or an unparseable string.
+        val parsedBalance = response.currentHold
+            ?.jsonPrimitive?.content?.toDoubleOrNull()?.toInt()
+        if (parsedBalance != null) _credits.value = parsedBalance
+
+        val parsedMaxCredits = response.maxCredits
+            ?.jsonPrimitive?.content?.toDoubleOrNull()?.toInt()
+        if (parsedMaxCredits != null) {
+            _maxCredits.value = parsedMaxCredits
+            _originalMaxCredits.value = parsedMaxCredits
+            creditsCache[userId] = parsedMaxCredits
+        }
+
+        response.isConsultant?.let { _isCurrentUserConsultant.value = it == 1 }
+    }
+
+    private fun seedDefaultBalanceIfEmpty() {
+        // Only seed defaults if we have no value at all; never clobber a known-good value
+        // from a previous successful refresh.
+        if (_credits.value == null) _credits.value = 0
+        if (_maxCredits.value == null) {
+            _maxCredits.value = 100
+            _originalMaxCredits.value = 100
         }
     }
 
@@ -260,23 +316,42 @@ class WalletService @Inject constructor(
 
     suspend fun createOrder(userId: String, amount: Double): Result<CreateOrderResponse> {
         return try {
-            val sessionData = sessionStore.getSession(userId)
-            val identifier = sessionData?.webuddyName ?: userId
-            val rechargeRequest = RechargeWalletRequest(
-                userId = identifier,
-                amount = amount
-            )
-            val response = walletApi.createOrder(rechargeRequest)
-            Timber.d("Order created successfully for $userId: ${response.orderId}")
-            
-            // Store mapping
-            orderToTransactionMap[response.orderId] = response.transactionId
-            
-            Result.success(response)
+            Result.success(callCreateOrder(userId, amount))
+        } catch (e: HttpException) {
+            // Self-heal "User not found" 404s. Some users (those whose initial sign-up
+            // createUser was silently swallowed by a network blip / race) never had a wallet
+            // record created on the backend, so every recharge hits 404. Auto-create the
+            // wallet user once and retry the recharge transparently.
+            if (e.code() == 404) {
+                Timber.w("createOrder: 404 'User not found' for $userId — auto-creating wallet user and retrying once")
+                ensureWalletUserExists(userId)
+                try {
+                    Result.success(callCreateOrder(userId, amount))
+                } catch (retryErr: Exception) {
+                    Timber.e(retryErr, "Recharge retry failed for $userId after auto-create")
+                    Result.failure(retryErr)
+                }
+            } else {
+                Timber.e(e, "Failed to create order for $userId")
+                Result.failure(e)
+            }
         } catch (e: Exception) {
             Timber.e(e, "Failed to create order for $userId")
             Result.failure(e)
         }
+    }
+
+    private suspend fun callCreateOrder(userId: String, amount: Double): CreateOrderResponse {
+        val sessionData = sessionStore.getSession(userId)
+        val identifier = sessionData?.webuddyName ?: userId
+        val rechargeRequest = RechargeWalletRequest(
+            userId = identifier,
+            amount = amount
+        )
+        val response = walletApi.createOrder(rechargeRequest)
+        Timber.d("Order created successfully for $userId: ${response.orderId}")
+        orderToTransactionMap[response.orderId] = response.transactionId
+        return response
     }
 
     suspend fun verifyPayment(
@@ -311,14 +386,38 @@ class WalletService @Inject constructor(
 
     suspend fun getTransactionHistory(userId: String, page: Int = 1, pageSize: Int = 10): Result<TransactionHistoryResponse> {
         return try {
-            val sessionData = sessionStore.getSession(userId)
-            val identifier = sessionData?.webuddyName ?: userId
-            val response = walletApi.getTransactionHistory(identifier, page, pageSize)
-            Result.success(response)
+            Result.success(callGetTransactionHistory(userId, page, pageSize))
+        } catch (e: HttpException) {
+            if (e.code() == 404) {
+                // Same self-heal as createOrder: a missing wallet record on the backend.
+                // Without this, the wallet screen would permanently show "No transactions found"
+                // even after the user has a balance, because we can never page-load history.
+                Timber.w("getTransactionHistory: 404 'User not found' for $userId — auto-creating wallet user and retrying once")
+                ensureWalletUserExists(userId)
+                try {
+                    Result.success(callGetTransactionHistory(userId, page, pageSize))
+                } catch (retryErr: Exception) {
+                    Timber.e(retryErr, "Transaction history retry failed for $userId after auto-create")
+                    Result.failure(retryErr)
+                }
+            } else {
+                Timber.e(e, "Failed to get transaction history for $userId")
+                Result.failure(e)
+            }
         } catch (e: Exception) {
             Timber.e(e, "Failed to get transaction history for $userId")
             Result.failure(e)
         }
+    }
+
+    private suspend fun callGetTransactionHistory(
+        userId: String,
+        page: Int,
+        pageSize: Int,
+    ): TransactionHistoryResponse {
+        val sessionData = sessionStore.getSession(userId)
+        val identifier = sessionData?.webuddyName ?: userId
+        return walletApi.getTransactionHistory(identifier, page, pageSize)
     }
 
     suspend fun initiateHold(clientId: String, consultantId: String): Result<Unit> {
