@@ -142,37 +142,40 @@ private fun RolePickerSection(
 ) {
     Column(modifier = modifier) {
         Text(
-            text = "I'll use Clariva as",
+            text = "Are you a Consultant?",
             style = ElementTheme.typography.fontBodyLgMedium,
             color = ElementTheme.colors.textPrimary,
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "Normal users initiate paid chats with consultants. You can keep the default if you're not sure.",
+            text = "Choose Yes if you'll receive paid chats. Otherwise leave it on No.",
             style = ElementTheme.typography.fontBodySmRegular,
             color = ElementTheme.colors.textSecondary,
         )
         Spacer(modifier = Modifier.height(12.dp))
-        RoleOption(
-            label = "Normal User",
-            description = "Initiate paid chats and recharge your wallet.",
-            selected = !isConsultant,
-            onClick = { onSelect(false) },
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        RoleOption(
-            label = "Consultant",
-            description = "Receive paid chats from normal users and get holds released to you.",
-            selected = isConsultant,
-            onClick = { onSelect(true) },
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            ConsultantYesNoOption(
+                label = "No",
+                selected = !isConsultant,
+                onClick = { onSelect(false) },
+                modifier = Modifier.weight(1f),
+            )
+            ConsultantYesNoOption(
+                label = "Yes",
+                selected = isConsultant,
+                onClick = { onSelect(true) },
+                modifier = Modifier.weight(1f),
+            )
+        }
     }
 }
 
 @Composable
-private fun RoleOption(
+private fun ConsultantYesNoOption(
     label: String,
-    description: String,
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -181,7 +184,6 @@ private fun RoleOption(
     val bgColor = if (selected) ElementTheme.colors.bgSubtleSecondary else ElementTheme.colors.bgCanvasDefault
     Row(
         modifier = modifier
-            .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(bgColor)
             .border(width = 1.dp, color = borderColor, shape = RoundedCornerShape(12.dp))
@@ -195,18 +197,11 @@ private fun RoleOption(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         RadioButton(selected = selected, onClick = null)
-        Column {
-            Text(
-                text = label,
-                style = ElementTheme.typography.fontBodyLgMedium,
-                color = ElementTheme.colors.textPrimary,
-            )
-            Text(
-                text = description,
-                style = ElementTheme.typography.fontBodySmRegular,
-                color = ElementTheme.colors.textSecondary,
-            )
-        }
+        Text(
+            text = label,
+            style = ElementTheme.typography.fontBodyLgMedium,
+            color = ElementTheme.colors.textPrimary,
+        )
     }
 }
 
