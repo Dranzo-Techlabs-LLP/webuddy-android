@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import io.element.android.libraries.designsystem.components.list.RadioButtonListItem
 import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.preview.PreviewGroup
@@ -40,6 +41,9 @@ fun SingleSelectionDialog(
     subtitle: String? = null,
     dismissButtonTitle: String = stringResource(CommonStrings.action_cancel),
     initialSelection: Int? = null,
+    // Defaults preserve prior behaviour; callers that must not be dismissed by an
+    // outside tap / back press (e.g. a choice that creates an account) can override.
+    properties: DialogProperties = DialogProperties(),
 ) {
     val decoratedSubtitle: @Composable (() -> Unit)? = subtitle?.let {
         @Composable {
@@ -52,6 +56,7 @@ fun SingleSelectionDialog(
     BasicAlertDialog(
         modifier = modifier,
         onDismissRequest = onDismissRequest,
+        properties = properties,
     ) {
         SingleSelectionDialogContent(
             title = title,

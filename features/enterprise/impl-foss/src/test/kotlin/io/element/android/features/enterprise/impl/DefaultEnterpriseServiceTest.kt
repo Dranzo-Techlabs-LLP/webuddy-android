@@ -25,15 +25,45 @@ class DefaultEnterpriseServiceTest {
     }
 
     @Test
-    fun `defaultHomeserverList should return empty list`() {
+    fun `defaultHomeserverList offers only clarivahub`() {
         val defaultEnterpriseService = DefaultEnterpriseService()
-        assertThat(defaultEnterpriseService.defaultHomeserverList()).isEmpty()
+        assertThat(defaultEnterpriseService.defaultHomeserverList()).containsExactly("clarivahub.com")
     }
 
     @Test
-    fun `isAllowedToConnectToHomeserver is true for all homeserver urls`() = runTest {
-        val defaultEnterpriseService = DefaultEnterpriseService()
-        assertThat(defaultEnterpriseService.isAllowedToConnectToHomeserver(A_HOMESERVER_URL)).isTrue()
+    fun `isAllowedToConnectToHomeserver accepts Clariva hosts in any URL form`() = runTest {
+        val service = DefaultEnterpriseService()
+        listOf(
+            "clarivahub.com",
+            "https://clarivahub.com",
+            "https://clarivahub.com/",
+            "https://matrix.clarivahub.com",
+            "https://MATRIX.CLARIVAHUB.COM/_matrix/client/versions",
+            "https://matrix.clarivahub.com:443/",
+        ).forEach {
+            assertThat(service.isAllowedToConnectToHomeserver(it)).isTrue()
+        }
+    }
+
+    @Test
+    fun `isAllowedToConnectToHomeserver rejects every other homeserver`() = runTest {
+        val service = DefaultEnterpriseService()
+        listOf(
+            A_HOMESERVER_URL,
+            "matrix.org",
+            "https://matrix.org",
+            "",
+            "   ",
+            // Substring/prefix confusion - these must NOT be treated as Clariva.
+            "https://clarivahub.com.attacker.net",
+            "https://notclarivahub.com",
+            "https://evil-clarivahub.com",
+            // Userinfo confusion: the real host here is attacker.net.
+            "https://clarivahub.com@attacker.net",
+            "https://matrix.clarivahub.com@attacker.net/path",
+        ).forEach {
+            assertThat(service.isAllowedToConnectToHomeserver(it)).isFalse()
+        }
     }
 
     @Test

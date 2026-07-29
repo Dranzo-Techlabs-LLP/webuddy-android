@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Clariva-specific strings for account deactivation.
+
+  Kept out of localazy.xml, which the Localazy sync regenerates.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+    <string name="clariva_deactivate_google_notice">You signed up with Google, so there is no password to confirm. Re-authorise with Google to prove this is your account.</string>
+    <string name="clariva_deactivate_google_authorize">Authorise with Google</string>
+    <string name="clariva_deactivate_google_authorized">Authorised with Google. You can now deactivate.</string>
+    <string name="clariva_deactivate_checking">Checking your account…</string>
+</resources>

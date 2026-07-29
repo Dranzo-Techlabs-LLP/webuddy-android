@@ -15,11 +15,23 @@ import kotlinx.parcelize.Parcelize
 data class AccountDeactivationState(
     val deactivateFormState: DeactivateFormState,
     val accountDeactivationAction: AsyncAction<Unit>,
+    /**
+     * Google accounts have NO password - the Clariva password field is
+     * meaningless for them, so they re-authorise with Google instead. Null while
+     * we are still asking the server which kind of account this is.
+     */
+    val isGoogleAccount: Boolean?,
+    /** True once Google has handed back a fresh ID token proving ownership. */
+    val isGoogleAuthorized: Boolean,
     val eventSink: (AccountDeactivationEvents) -> Unit,
 ) {
     val submitEnabled: Boolean
-        get() = accountDeactivationAction is AsyncAction.Uninitialized &&
-            deactivateFormState.password.isNotEmpty()
+        get() = accountDeactivationAction is AsyncAction.Uninitialized && when (isGoogleAccount) {
+            // Still loading the account type: do not let them submit blind.
+            null -> false
+            true -> isGoogleAuthorized
+            false -> deactivateFormState.password.isNotEmpty()
+        }
 }
 
 @Parcelize

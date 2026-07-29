@@ -31,6 +31,9 @@ open class AccountDeactivationStateProvider : PreviewParameterProvider<AccountDe
                 deactivateFormState = filledForm,
                 accountDeactivationAction = AsyncAction.Failure(Exception("Failed to deactivate account"))
             ),
+            // Google account: no password field, an "Authorise with Google" button.
+            anAccountDeactivationState(isGoogleAccount = true),
+            anAccountDeactivationState(isGoogleAccount = true, isGoogleAuthorized = true),
         )
 }
 
@@ -45,9 +48,13 @@ internal fun aDeactivateFormState(
 internal fun anAccountDeactivationState(
     deactivateFormState: DeactivateFormState = aDeactivateFormState(),
     accountDeactivationAction: AsyncAction<Unit> = AsyncAction.Uninitialized,
+    isGoogleAccount: Boolean? = false,
+    isGoogleAuthorized: Boolean = false,
     eventSink: (AccountDeactivationEvents) -> Unit = {},
 ) = AccountDeactivationState(
     deactivateFormState = deactivateFormState,
     accountDeactivationAction = accountDeactivationAction,
+    isGoogleAccount = isGoogleAccount,
+    isGoogleAuthorized = isGoogleAuthorized,
     eventSink = eventSink,
 )

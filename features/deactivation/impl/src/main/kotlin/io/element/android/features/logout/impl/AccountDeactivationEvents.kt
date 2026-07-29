@@ -13,4 +13,12 @@ sealed interface AccountDeactivationEvents {
     data class SetPassword(val password: String) : AccountDeactivationEvents
     data class DeactivateAccount(val isRetry: Boolean) : AccountDeactivationEvents
     data object CloseDialogs : AccountDeactivationEvents
+
+    /** Google-account users tap "Authorise with Google" instead of typing a password. */
+    data object AuthorizeWithGoogle : AccountDeactivationEvents
+
+    /** Credential Manager returned a fresh ID token proving account ownership. */
+    data class GoogleAuthorized(val idToken: String) : AccountDeactivationEvents
+
+    data class GoogleAuthorizationFailed(val message: String) : AccountDeactivationEvents
 }

@@ -74,6 +74,7 @@ import kotlinx.collections.immutable.persistentListOf
 fun AccountDeactivationView(
     state: AccountDeactivationState,
     onBackClick: () -> Unit,
+    onAuthorizeWithGoogleClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val eventSink = state.eventSink
@@ -103,7 +104,8 @@ fun AccountDeactivationView(
                 state = state,
                 onSubmitClick = {
                     eventSink(AccountDeactivationEvents.DeactivateAccount(isRetry = false))
-                }
+                },
+                onAuthorizeWithGoogleClick = onAuthorizeWithGoogleClick,
             )
             Spacer(modifier = Modifier.height(32.dp))
             Buttons(
@@ -148,6 +150,7 @@ private fun ColumnScope.Buttons(
 private fun Content(
     state: AccountDeactivationState,
     onSubmitClick: () -> Unit,
+    onAuthorizeWithGoogleClick: () -> Unit,
 ) {
     val isLoading by remember(state.deactivateFormState) {
         derivedStateOf {
@@ -251,6 +254,38 @@ private fun Content(
             )
         }
 
+        // Google accounts have no Clariva password, so a password field would be
+        // unfillable. They prove ownership by re-authorising with Google instead.
+        if (state.isGoogleAccount == true) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.clariva_deactivate_google_notice),
+                    style = ElementTheme.typography.fontBodyMdRegular,
+                    color = ElementTheme.colors.textSecondary,
+                )
+                if (state.isGoogleAuthorized) {
+                    Text(
+                        text = stringResource(R.string.clariva_deactivate_google_authorized),
+                        style = ElementTheme.typography.fontBodyMdMedium,
+                        color = ElementTheme.colors.textSuccessPrimary,
+                    )
+                } else {
+                    Button(
+                        text = stringResource(R.string.clariva_deactivate_google_authorize),
+                        enabled = !isLoading,
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = onAuthorizeWithGoogleClick,
+                    )
+                }
+            }
+            return@Column
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -317,5 +352,6 @@ internal fun AccountDeactivationViewPreview(
     AccountDeactivationView(
         state,
         onBackClick = {},
+        onAuthorizeWithGoogleClick = {},
     )
 }

@@ -88,7 +88,19 @@ class DefaultFtueService(
             } else {
                 getNextStep(FtueStep.WaitingForInitialState)
             }
-            FtueStep.WaitingForInitialState -> if (isSessionNotVerified() || userNeedsToConfirmSessionVerificationSuccess.value) {
+            // The skip flag (canSkipVerification) must be authoritative here. It is
+            // already honored inside isSessionNotVerified(), but the
+            // userNeedsToConfirmSessionVerificationSuccess term is set to true
+            // independently for any NotVerified session, which would otherwise force
+            // the verification step even when skip is set. Clariva sessions are
+            // provisioned server-side and have no Matrix password / recovery key, so
+            // on a second device none of the verification routes are usable - they
+            // opt out via this flag. This guard only affects sessions that explicitly
+            // set skip; normal sessions (skip=false) are unchanged.
+            FtueStep.WaitingForInitialState -> if (
+                isSessionNotVerified() ||
+                (userNeedsToConfirmSessionVerificationSuccess.value && !canSkipVerification())
+            ) {
                 FtueStep.SessionVerification
             } else {
                 getNextStep(FtueStep.SessionVerification)
@@ -120,7 +132,21 @@ class DefaultFtueService(
     }
 
     private suspend fun canSkipVerification(): Boolean {
-        return sessionPreferencesStore.isSessionVerificationSkipped().first()
+        // Clariva fork: mandatory FTUE session verification is ALWAYS skippable.
+        // Accounts are provisioned server-side and users never hold a Matrix
+        // password or recovery key, so on a second device none of Element's verify
+        // routes (other device / recovery key / password reset) are usable and the
+        // FTUE would otherwise wall the user off at "Confirm your identity". Users
+        // can still verify or set up recovery manually from Settings; only the
+        // mandatory gate is removed. The per-session skip preference is still
+        // honored if ever set (OR), but we no longer rely on writing it at login -
+        // opening that session-scoped DataStore from the login (AppScope) presenter
+        // collided with the session's own DataStore on the same file.
+        //
+        // sessionPreferencesStore is still read once so the store is initialised as
+        // before and the injected dependency is not left unused.
+        sessionPreferencesStore.isSessionVerificationSkipped().first()
+        return true
     }
 
     private suspend fun needsAnalyticsOptIn(): Boolean {

@@ -11,6 +11,7 @@ package io.element.android.features.enterprise.impl
 import androidx.compose.ui.graphics.Color
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
+import io.element.android.appconfig.OnBoardingConfig
 import io.element.android.compound.colors.SemanticColorsLightDark
 import io.element.android.features.enterprise.api.BugReportUrl
 import io.element.android.features.enterprise.api.EnterpriseService
@@ -24,8 +25,40 @@ class DefaultEnterpriseService : EnterpriseService {
 
     override suspend fun isEnterpriseUser(sessionId: SessionId) = false
 
-    override fun defaultHomeserverList(): List<String> = emptyList()
-    override suspend fun isAllowedToConnectToHomeserver(homeserverUrl: String) = true
+    /**
+     * Clariva offers exactly one account provider. Returning a non-empty list
+     * here is what suppresses the "change account provider" affordances in
+     * onboarding.
+     */
+    override fun defaultHomeserverList(): List<String> = listOf(OnBoardingConfig.ACCOUNT_PROVIDER)
+
+    /**
+     * Closed deployment: only Clariva's own hosts may be connected to.
+     *
+     * Compares the PARSED host for exact equality. A `startsWith`/`contains`
+     * check would accept `clarivahub.com.attacker.net`, and ignoring userinfo
+     * would accept `https://clarivahub.com@attacker.net/`.
+     */
+    override suspend fun isAllowedToConnectToHomeserver(homeserverUrl: String): Boolean {
+        val host = parseHost(homeserverUrl) ?: return false
+        return host in OnBoardingConfig.ALLOWED_HOMESERVER_HOSTS
+    }
+
+    private fun parseHost(value: String): String? {
+        val trimmed = value.trim()
+        if (trimmed.isEmpty()) return null
+        // Strip scheme, then path/query/fragment, then userinfo, then port.
+        val withoutScheme = trimmed.substringAfter("://", trimmed)
+        val authority = withoutScheme
+            .substringBefore('/')
+            .substringBefore('?')
+            .substringBefore('#')
+        val host = authority
+            .substringAfterLast('@')
+            .substringBefore(':')
+            .lowercase()
+        return host.ifEmpty { null }
+    }
 
     override suspend fun overrideBrandColor(sessionId: SessionId?, brandColor: String?) = Unit
 

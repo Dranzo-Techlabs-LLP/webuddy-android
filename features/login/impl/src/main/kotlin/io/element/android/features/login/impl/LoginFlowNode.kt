@@ -31,6 +31,7 @@ import io.element.android.features.login.api.LoginEntryPoint
 import io.element.android.features.login.impl.accountprovider.AccountProviderDataSource
 import io.element.android.features.login.impl.qrcode.QrCodeLoginFlowNode
 import io.element.android.features.login.impl.screens.changeaccountprovider.ChangeAccountProviderNode
+import io.element.android.features.login.impl.screens.clarivaauth.ClarivaAuthNode
 import io.element.android.features.login.impl.screens.chooseaccountprovider.ChooseAccountProviderNode
 import io.element.android.features.login.impl.screens.confirmaccountprovider.ConfirmAccountProviderNode
 import io.element.android.features.login.impl.screens.createaccount.CreateAccountNode
@@ -64,7 +65,11 @@ class LoginFlowNode(
     private val appCoroutineScope: CoroutineScope,
 ) : BaseFlowNode<LoginFlowNode.NavTarget>(
     backstack = BackStack(
-        initialElement = NavTarget.OnBoarding,
+        // Clariva's landing page IS the account screen: it carries the same logo
+        // and welcome copy as the old onboarding screen, with the sign-in fields
+        // directly beneath, so a returning user signs in without an extra tap.
+        // NavTarget.OnBoarding is kept resolvable but is no longer reachable.
+        initialElement = NavTarget.ClarivaAuth,
         savedStateMap = buildContext.savedStateMap,
     ),
     buildContext = buildContext,
@@ -124,6 +129,14 @@ class LoginFlowNode(
         @Parcelize
         data object LoginPassword : NavTarget
 
+        /**
+         * Clariva email / Google account screen. This replaces the Matrix password
+         * screen: accounts are provisioned by the Clariva API and the user never
+         * has a Matrix password to type.
+         */
+        @Parcelize
+        data object ClarivaAuth : NavTarget
+
         @Parcelize
         data class CreateAccount(val url: String) : NavTarget
     }
@@ -132,20 +145,15 @@ class LoginFlowNode(
         return when (navTarget) {
             NavTarget.OnBoarding -> {
                 val callback = object : OnBoardingNode.Callback {
+                    // Clariva provisions accounts through its own API, so both sign-up
+                    // and sign-in land on the Clariva account screen rather than the
+                    // Matrix account-provider / password screens.
                     override fun navigateToSignUpFlow() {
-                        backstack.push(
-                            NavTarget.ConfirmAccountProvider(isAccountCreation = true)
-                        )
+                        backstack.push(NavTarget.ClarivaAuth)
                     }
 
                     override fun navigateToSignInFlow(mustChooseAccountProvider: Boolean) {
-                        backstack.push(
-                            if (mustChooseAccountProvider) {
-                                NavTarget.ChooseAccountProvider
-                            } else {
-                                NavTarget.ConfirmAccountProvider(isAccountCreation = false)
-                            }
-                        )
+                        backstack.push(NavTarget.ClarivaAuth)
                     }
 
                     override fun navigateToQrCode() {
@@ -165,7 +173,9 @@ class LoginFlowNode(
                     }
 
                     override fun navigateToLoginPassword() {
-                        backstack.push(NavTarget.LoginPassword)
+                        // Matrix password login is unreachable for Clariva accounts -
+                        // their Matrix password is machine-generated and never shown.
+                        backstack.push(NavTarget.ClarivaAuth)
                     }
 
                     override fun onDone() {
@@ -190,7 +200,9 @@ class LoginFlowNode(
                     }
 
                     override fun navigateToLoginPassword() {
-                        backstack.push(NavTarget.LoginPassword)
+                        // Matrix password login is unreachable for Clariva accounts -
+                        // their Matrix password is machine-generated and never shown.
+                        backstack.push(NavTarget.ClarivaAuth)
                     }
                 }
                 createNode<ChooseAccountProviderNode>(buildContext, listOf(callback))
@@ -212,7 +224,9 @@ class LoginFlowNode(
                     }
 
                     override fun navigateToLoginPassword() {
-                        backstack.push(NavTarget.LoginPassword)
+                        // Matrix password login is unreachable for Clariva accounts -
+                        // their Matrix password is machine-generated and never shown.
+                        backstack.push(NavTarget.ClarivaAuth)
                     }
 
                     override fun navigateToChangeAccountProvider() {
@@ -253,6 +267,9 @@ class LoginFlowNode(
             }
             NavTarget.LoginPassword -> {
                 createNode<LoginPasswordNode>(buildContext)
+            }
+            NavTarget.ClarivaAuth -> {
+                createNode<ClarivaAuthNode>(buildContext)
             }
             is NavTarget.CreateAccount -> {
                 val inputs = CreateAccountNode.Inputs(

@@ -115,3 +115,15 @@ lint/tmp/
 .DS_Store
 
 checkouts/**
+
+# Clariva: release signing & local secrets (NEVER commit)
+keystore.properties
+/app/signature/release.jks
+release.jks
+
+# Clariva: local test artifacts (screenshots, Play submission kit)
+/reports/
+/tools/reports/
+/app_screenshot*.png
+/clariva_*.png
+/role_*.png

@@ -42,6 +42,7 @@ dependencies {
     implementation(projects.libraries.testtags)
     implementation(projects.libraries.uiStrings)
     implementation(projects.libraries.permissions.api)
+    implementation(projects.libraries.preferences.api)
     implementation(projects.libraries.sessionStorage.api)
     implementation(projects.libraries.qrcode)
     implementation(projects.libraries.oidc.api)
@@ -49,6 +50,9 @@ dependencies {
     implementation(projects.libraries.wellknown.api)
     implementation(libs.androidx.browser)
     implementation(libs.androidx.webkit)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services)
+    implementation(libs.google.identity.googleid)
     implementation(libs.serialization.json)
     api(projects.features.login.api)
 

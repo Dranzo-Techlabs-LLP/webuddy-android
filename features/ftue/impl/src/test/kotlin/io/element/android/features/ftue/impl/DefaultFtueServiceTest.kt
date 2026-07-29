@@ -101,6 +101,8 @@ class DefaultFtueServiceTest {
 
     @Test
     fun `traverse flow`() = runTest {
+        // Clariva fork: session verification is always skipped (canSkipVerification),
+        // so even a NotVerified session never routes to FtueStep.SessionVerification.
         val sessionVerificationService = FakeSessionVerificationService().apply {
             emitVerifiedStatus(SessionVerifiedStatus.NotVerified)
         }
@@ -116,12 +118,7 @@ class DefaultFtueServiceTest {
 
         service.ftueStepStateFlow.test {
             assertThat(awaitItem()).isEqualTo(InternalFtueState.Unknown)
-            // Session verification
-            assertThat(awaitItem()).isEqualTo(InternalFtueState.Incomplete(FtueStep.SessionVerification))
-            sessionVerificationService.emitVerifiedStatus(SessionVerifiedStatus.Verified)
-            // User completes verification
-            service.onUserCompletedSessionVerification()
-            // Notifications opt in
+            // Session verification is skipped entirely - first real step is notifications.
             assertThat(awaitItem()).isEqualTo(InternalFtueState.Incomplete(FtueStep.NotificationsOptIn))
             permissionStateProvider.setPermissionGranted()
             // Simulate event from NotificationsOptInNode.Callback.onNotificationsOptInFinished
@@ -136,6 +133,30 @@ class DefaultFtueServiceTest {
             analyticsService.setDidAskUserConsent()
             // Final step
             assertThat(awaitItem()).isEqualTo(InternalFtueState.Complete)
+        }
+    }
+
+    @Test
+    fun `session verification is always skipped even when the session is NotVerified`() = runTest {
+        // Regression: a returning Clariva user on a second device is NotVerified but
+        // has no way to verify (no Matrix password / recovery key). The FTUE must not
+        // wall them off at SessionVerification.
+        val sessionVerificationService = FakeSessionVerificationService().apply {
+            emitVerifiedStatus(SessionVerifiedStatus.NotVerified)
+        }
+        // Pre-satisfy the other steps so the first emitted step isolates verification.
+        val service = createDefaultFtueService(
+            sessionVerificationService = sessionVerificationService,
+            permissionStateProvider = FakePermissionStateProvider(permissionGranted = true),
+            lockScreenService = FakeLockScreenService().apply { setIsPinSetup(true) },
+        )
+
+        service.ftueStepStateFlow.test {
+            assertThat(awaitItem()).isEqualTo(InternalFtueState.Unknown)
+            // Goes straight to analytics opt-in - never SessionVerification.
+            val firstStep = awaitItem()
+            assertThat(firstStep).isEqualTo(InternalFtueState.Incomplete(FtueStep.AnalyticsOptIn))
+            assertThat(firstStep).isNotEqualTo(InternalFtueState.Incomplete(FtueStep.SessionVerification))
         }
     }
 

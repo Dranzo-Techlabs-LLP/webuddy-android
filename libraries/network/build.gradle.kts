@@ -25,6 +25,7 @@ android {
 setupDependencyInjection()
 
 dependencies {
+    implementation(projects.appconfig)
     implementation(projects.libraries.androidutils)
     implementation(projects.libraries.core)
     implementation(projects.libraries.di)
@@ -38,4 +39,9 @@ dependencies {
     implementation(libs.network.retrofit)
     implementation(libs.network.retrofit.converter.serialization)
     implementation(libs.serialization.json)
+    // Google Sign-In via Credential Manager. Lives here, not in a feature
+    // module, because both sign-in and account deactivation need an ID token.
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services)
+    implementation(libs.google.identity.googleid)
 }
