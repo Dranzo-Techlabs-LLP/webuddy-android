@@ -44,12 +44,10 @@ suspend fun requestGoogleIdToken(context: Context): GoogleSignInResult {
         return GoogleSignInResult.Failure("Google sign-in is not configured in this build.")
     }
 
-    // First pass: only accounts already authorised for this app, which gives
-    // returning users a one-tap sheet instead of the full picker.
-    requestWith(context, filterByAuthorizedAccounts = true)?.let { return it }
-
-    // Nothing previously authorised (first run, or after clearing data) - show
-    // the full account picker.
+    // Always offer EVERY Google account on the device, not just the ones already
+    // authorised for Clariva. Filtering to authorised accounts first shows a
+    // one-tap sheet for the last-used account, which silently hides the other
+    // accounts a user may want to sign in with (and gives them no way to pick).
     return requestWith(context, filterByAuthorizedAccounts = false)
         ?: GoogleSignInResult.Failure(
             "No Google account is available on this device. Add one in Settings and try again."

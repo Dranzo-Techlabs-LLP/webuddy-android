@@ -87,6 +87,10 @@ data class ClarivaGoogleRequest(
     // silently defaulting every Google user to a normal client. Omitted from the
     // JSON when null, which is exactly what the server checks for.
     @SerialName("isConsultant") val isConsultant: Int? = null,
+    // "signup" makes an already-registered email a hard error telling the user to
+    // sign in, instead of silently signing them in from the sign-up screen.
+    // Null (omitted) keeps the permissive sign-in behaviour.
+    @SerialName("mode") val mode: String? = null,
 )
 
 /**
@@ -98,6 +102,9 @@ data class ClarivaGoogleResponse(
     @SerialName("needsRole") val needsRole: Boolean? = null,
     @SerialName("email") val email: String? = null,
     @SerialName("name") val name: String? = null,
+    // True when the row already exists and only its role is missing, so the
+    // prompt can say "finish setting up" rather than "create your account".
+    @SerialName("isExisting") val isExisting: Boolean? = null,
     @SerialName("token") val token: String? = null,
     @SerialName("user") val user: ClarivaUser? = null,
 )

@@ -40,14 +40,19 @@
 
     <string name="clariva_auth_google_not_configured">Google sign-in needs a server client ID to be configured.</string>
 
-    <!-- Role choice for a brand-new Google user; the account is created by it. -->
-    <string name="clariva_google_role_title">How will you use Clariva?</string>
-    <string name="clariva_google_role_subtitle">Choose your role to finish creating your account. This can be changed later in Settings.</string>
-    <string name="clariva_google_role_subtitle_with_email">Finish creating your account for %1$s. This can be changed later in Settings.</string>
-    <string name="clariva_google_role_client">I am here to consult</string>
-    <string name="clariva_google_role_client_hint">Chat with consultants and pay per conversation.</string>
-    <string name="clariva_google_role_consultant">I am a consultant</string>
-    <string name="clariva_google_role_consultant_hint">Get paid for the chats you take.</string>
+    <!-- Role choice for a Google user whose role is not yet known. Only shown
+         when the account is being created, or when an existing row has no role
+         recorded - a returning user with a role is never asked. -->
+    <string name="clariva_google_role_title">Are you a consultant?</string>
+    <string name="clariva_google_role_subtitle">Consultants are paid for the chats they take. This can be changed later in Settings.</string>
+    <string name="clariva_google_role_subtitle_with_email">Setting up %1$s. Consultants are paid for the chats they take; this can be changed later in Settings.</string>
+    <string name="clariva_google_role_no">No</string>
+    <string name="clariva_google_role_no_hint">Chat with consultants and pay per conversation.</string>
+    <string name="clariva_google_role_yes">Yes</string>
+    <string name="clariva_google_role_yes_hint">Get paid for the chats you take.</string>
+    <string name="clariva_google_role_confirm">Continue</string>
+
+    <string name="clariva_auth_error_email_exists">An account with this email already exists. Please sign in instead.</string>
 
     <string name="clariva_auth_error_title">Sign-in failed</string>
     <string name="clariva_auth_error_generic">Something went wrong. Please try again.</string>

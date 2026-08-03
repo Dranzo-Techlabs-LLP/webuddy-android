@@ -49,7 +49,12 @@ class ClarivaAuthService(
     /** Google sign-in either completes, or stops to ask a new user for their role. */
     sealed interface GoogleAuthOutcome {
         data class SignedIn(val credentials: Credentials) : GoogleAuthOutcome
-        data class RoleRequired(val email: String?, val name: String?) : GoogleAuthOutcome
+        data class RoleRequired(
+            val email: String?,
+            val name: String?,
+            /** The account exists and only its role is missing. */
+            val isExisting: Boolean = false,
+        ) : GoogleAuthOutcome
     }
 
     suspend fun signUpWithEmail(
@@ -80,17 +85,30 @@ class ClarivaAuthService(
      * [isConsultant] is null on the first attempt so the server can answer
      * "needsRole" rather than defaulting everyone to a normal client.
      */
-    suspend fun signInWithGoogle(idToken: String, isConsultant: Boolean?): Result<GoogleAuthOutcome> {
+    suspend fun signInWithGoogle(
+        idToken: String,
+        isConsultant: Boolean?,
+        isSignUp: Boolean = false,
+    ): Result<GoogleAuthOutcome> {
         return try {
             val response = clarivaAuthApi.google(
                 ClarivaGoogleRequest(
                     idToken = idToken,
                     isConsultant = isConsultant?.let { if (it) 1 else 0 },
+                    // Only the sign-up screen opts in to the stricter behaviour;
+                    // sign-in must keep working for accounts that already exist.
+                    mode = if (isSignUp) "signup" else null,
                 )
             )
 
             if (response.needsRole == true) {
-                return Result.success(GoogleAuthOutcome.RoleRequired(response.email, response.name))
+                return Result.success(
+                    GoogleAuthOutcome.RoleRequired(
+                        email = response.email,
+                        name = response.name,
+                        isExisting = response.isExisting == true,
+                    )
+                )
             }
 
             val token = response.token

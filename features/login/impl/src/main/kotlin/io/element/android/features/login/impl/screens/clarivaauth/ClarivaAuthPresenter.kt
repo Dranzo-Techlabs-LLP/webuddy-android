@@ -129,12 +129,20 @@ class ClarivaAuthPresenter(
                 }
                 is ClarivaAuthEvents.SubmitGoogleIdToken -> {
                     authAction = AsyncData.Loading()
+                    // Captured now: the dialog may outlive a mode toggle, and the
+                    // follow-up call must match the screen the user actually used.
+                    val startedFromSignUp = mode == ClarivaAuthMode.SignUp
                     coroutineScope.launch {
-                        // isConsultant = null: let the server tell us whether this
-                        // is a new user who still has to pick a role.
+                        // isConsultant = null: let the server tell us whether the
+                        // role is still unknown for this identity.
                         authAction = handleGoogleOutcome(
-                            result = clarivaAuthService.signInWithGoogle(event.idToken, isConsultant = null),
+                            result = clarivaAuthService.signInWithGoogle(
+                                idToken = event.idToken,
+                                isConsultant = null,
+                                isSignUp = startedFromSignUp,
+                            ),
                             idToken = event.idToken,
+                            isSignUp = startedFromSignUp,
                             onRoleRequired = { googleRolePrompt = it },
                         )
                     }
@@ -148,8 +156,14 @@ class ClarivaAuthPresenter(
                             result = clarivaAuthService.signInWithGoogle(
                                 idToken = prompt.idToken,
                                 isConsultant = event.isConsultant,
+                                // Never "signup" here: the server already told us
+                                // this identity needs a role, so re-asserting
+                                // sign-up would reject the very account we are
+                                // finishing setup for.
+                                isSignUp = false,
                             ),
                             idToken = prompt.idToken,
+                            isSignUp = false,
                             // The server already asked once; a second prompt would
                             // mean something is wrong, so treat it as an error.
                             onRoleRequired = null,
@@ -198,6 +212,7 @@ class ClarivaAuthPresenter(
     private suspend fun handleGoogleOutcome(
         result: Result<ClarivaAuthService.GoogleAuthOutcome>,
         idToken: String,
+        isSignUp: Boolean,
         onRoleRequired: ((GoogleRolePrompt) -> Unit)?,
     ): AsyncData<Unit> {
         return result.fold(
@@ -210,7 +225,12 @@ class ClarivaAuthPresenter(
                             AsyncData.Failure(Exception("Could not complete Google sign-up. Please try again."))
                         } else {
                             onRoleRequired(
-                                GoogleRolePrompt(idToken = idToken, email = outcome.email, name = outcome.name)
+                                GoogleRolePrompt(
+                                    idToken = idToken,
+                                    email = outcome.email,
+                                    name = outcome.name,
+                                    isExisting = outcome.isExisting,
+                                )
                             )
                             // Leave the button idle while the dialog is up.
                             AsyncData.Uninitialized

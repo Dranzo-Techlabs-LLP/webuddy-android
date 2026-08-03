@@ -8,17 +8,23 @@
 package io.element.android.appconfig
 
 object ClarivaConfig {
+    /** Production Wallet-API. */
+    const val PRODUCTION_API_BASE_URL = "https://wallet.dranzo.com/"
+
+    /**
+     * The host machine as seen from the Android emulator. Already allow-listed
+     * for cleartext in res/xml/network_security_config.xml; production is https
+     * and needs no such exception.
+     */
+    const val LOCAL_EMULATOR_API_BASE_URL = "http://10.0.2.2:3000/"
+
     /**
      * Base URL of the Clariva Wallet-API (auth + wallet).
      *
-     * `10.0.2.2` is the host machine as seen from the Android emulator, and is
-     * already allow-listed for cleartext in res/xml/network_security_config.xml.
-     * Point this back at the production host before shipping a release build.
+     * Swap to [LOCAL_EMULATOR_API_BASE_URL] to run against a laptop-hosted API
+     * in the emulator; anything shipped to a device must stay on production.
      */
-    const val API_BASE_URL = "http://10.0.2.2:3000/"
-
-    /** Production value, kept here so switching back is a one-line change. */
-    const val PRODUCTION_API_BASE_URL = "https://wallet.dranzo.com/"
+    const val API_BASE_URL = PRODUCTION_API_BASE_URL
 
     /**
      * Google OAuth **Web/server** client ID from Google Cloud Console.

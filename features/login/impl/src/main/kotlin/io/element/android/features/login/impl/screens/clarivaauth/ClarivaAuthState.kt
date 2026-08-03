@@ -15,13 +15,19 @@ enum class ClarivaAuthMode {
 }
 
 /**
- * A new Google user must choose their role before the account is created.
- * [idToken] is kept so the choice can be submitted without re-prompting Google.
+ * The role of this Google identity is still unknown, so it must be chosen before
+ * sign-in can complete. [idToken] is kept so the choice can be submitted without
+ * re-prompting Google.
+ *
+ * Raised for a brand-new account, and for the rare existing row whose role was
+ * never recorded - a returning user with a role set is never asked.
  */
 data class GoogleRolePrompt(
     val idToken: String,
     val email: String?,
     val name: String?,
+    /** The account already exists; only the role is missing. */
+    val isExisting: Boolean = false,
 )
 
 /** Live result of the server-side handle lookup on the sign-up form. */
