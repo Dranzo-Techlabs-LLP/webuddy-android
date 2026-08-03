@@ -73,6 +73,8 @@ import io.element.android.libraries.matrix.api.core.toRoomIdOrAlias
 import io.element.android.libraries.matrix.api.media.MediaSource
 import io.element.android.libraries.matrix.api.permalink.PermalinkData
 import io.element.android.libraries.matrix.api.room.BaseRoom
+import io.element.android.libraries.matrix.api.room.getDirectRoomMember
+import io.element.android.libraries.matrix.api.room.isDm
 import io.element.android.libraries.matrix.api.room.alias.matches
 import io.element.android.libraries.matrix.api.room.joinedRoomMembers
 import io.element.android.libraries.matrix.api.roomlist.RoomListService
@@ -88,9 +90,11 @@ import io.element.android.libraries.textcomposer.mentions.MentionSpanUpdater
 import io.element.android.services.analytics.api.AnalyticsService
 import io.element.android.services.analyticsproviders.api.trackers.captureInteraction
 import kotlinx.collections.immutable.ImmutableList
+import io.element.android.libraries.network.wallet.WalletService
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.parcelize.Parcelize
 import kotlin.time.Duration.Companion.milliseconds
@@ -120,6 +124,7 @@ class MessagesFlowNode(
     private val knockRequestsListEntryPoint: KnockRequestsListEntryPoint,
     private val dateFormatter: DateFormatter,
     private val coroutineDispatchers: CoroutineDispatchers,
+    private val walletService: WalletService,
 ) : BaseFlowNode<MessagesFlowNode.NavTarget>(
     backstack = BackStack(
         initialElement = plugins.filterIsInstance<MessagesEntryPoint.Params>().first().initialTarget.toNavTarget(),
@@ -278,6 +283,8 @@ class MessagesFlowNode(
                             roomId = roomId,
                         )
                         analyticsService.captureInteraction(Interaction.Name.MobileRoomCallButton)
+                        // Starting a call bills on the same terms as messaging.
+                        chargeForCallIfNeeded()
                         elementCallEntryPoint.startCall(callType)
                     }
 
@@ -494,6 +501,8 @@ class MessagesFlowNode(
                             roomId = roomId,
                         )
                         analyticsService.captureInteraction(Interaction.Name.MobileRoomCallButton)
+                        // Starting a call bills on the same terms as messaging.
+                        chargeForCallIfNeeded()
                         elementCallEntryPoint.startCall(callType)
                     }
 
@@ -620,6 +629,35 @@ class MessagesFlowNode(
         delay(10.milliseconds)
         // Then push the new threads screen on top
         backstack.push(NavTarget.Thread(threadId, focusedEventId))
+    }
+
+    /**
+     * Charge for starting a call, on the same terms as sending a message.
+     *
+     * Deliberately the SAME hold as the composer takes: a hold is one prepaid
+     * 24h window per (client, consultant), so chatting and then calling the same
+     * consultant inside that window bills once, not twice. The backend is the
+     * authority on that - initiateHold is idempotent per pair per 24h - so
+     * calling it here can only start a window, never double-charge one.
+     *
+     * Fire-and-forget on purpose: the call must not be blocked on the wallet
+     * round-trip. A consultant calling a client is a no-op (WalletService drops
+     * it when the current user is the consultant), and non-DM rooms never bill.
+     */
+    private fun chargeForCallIfNeeded() {
+        lifecycleScope.launch {
+            val roomInfo = room.roomInfoFlow.value
+            if (!roomInfo.isDm) return@launch
+            val otherUserId = room.membersStateFlow.value
+                .getDirectRoomMember(roomInfo, room.sessionId)
+                ?.userId
+                ?.value
+                ?: return@launch
+            walletService.initiateHold(
+                clientId = room.sessionId.value,
+                consultantId = otherUserId,
+            )
+        }
     }
 
     @Composable
