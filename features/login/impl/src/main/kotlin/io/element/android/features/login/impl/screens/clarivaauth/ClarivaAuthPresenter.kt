@@ -322,7 +322,30 @@ class ClarivaAuthPresenter(
                 // on the server, not yet on this device.
                 RecoveryState.ENABLED, RecoveryState.INCOMPLETE -> {
                     Timber.d("Unlocking existing key storage")
-                    encryption.recover(passphrase).getOrThrow()
+                    val opened = encryption.recover(passphrase)
+                    if (opened.exceptionOrNull() is RecoveryException.SecretStorage) {
+                        // Key storage exists but our passphrase does not open it:
+                        // it was created WITHOUT one, which only the "Set up
+                        // recovery" screen does - locking it with a random key
+                        // that just the user saw. (It surfaces as a base58 parse
+                        // error because, with no passphrase KDF recorded, the SDK
+                        // can only treat the input as a recovery key.)
+                        //
+                        // This device CANNOT repair it. Resetting needs
+                        // disableRecovery(), which fails with "backups are not
+                        // enabled" precisely because we could not open key
+                        // storage - a device that cannot read it cannot delete it
+                        // either. The stale secret storage and backup version have
+                        // to be cleared server-side, after which the next sign-in
+                        // takes the DISABLED branch above and sets things up
+                        // correctly.
+                        Timber.w(
+                            "Key storage was created without a passphrase and cannot be opened or " +
+                                "reset from this device; history stays unavailable until it is cleared server-side"
+                        )
+                    } else {
+                        opened.getOrThrow()
+                    }
                 }
                 else -> Timber.d("Key storage in state $state; nothing to do")
             }
