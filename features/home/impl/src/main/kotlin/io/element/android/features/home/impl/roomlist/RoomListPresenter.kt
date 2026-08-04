@@ -196,18 +196,20 @@ class RoomListPresenter(
         securityBannerDismissed: Boolean,
         recoveryState: RecoveryState,
     ): SecurityBannerState {
-        if (securityBannerDismissed) {
-            return SecurityBannerState.None
-        }
-
-        when (recoveryState) {
-            RecoveryState.DISABLED -> return SecurityBannerState.SetUpRecovery
-            RecoveryState.INCOMPLETE -> return SecurityBannerState.RecoveryKeyConfirmation
-            RecoveryState.UNKNOWN,
-            RecoveryState.WAITING_FOR_SYNC,
-            RecoveryState.ENABLED -> Unit
-        }
-
+        // Clariva: never prompt for a recovery key.
+        //
+        // Key storage is provisioned automatically at sign-in from a passphrase
+        // the backend derives, which is what lets history follow a user onto any
+        // device without verifying it. Offering "Set up recovery" here is not
+        // merely redundant, it is DESTRUCTIVE: the screen behind it calls
+        // enableRecovery() with no passphrase, replacing the account's secret
+        // storage with one locked by a fresh 56-char key the server does not
+        // know. Every other device would then be locked out of the key backup
+        // and lose access to history.
+        //
+        // Suppressed here rather than by deleting features/securebackup, which
+        // is still required to compile (LoggedInFlowNode injects its entry
+        // point) and is the mechanism that ClarivaAuthPresenter drives.
         return SecurityBannerState.None
     }
 

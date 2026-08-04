@@ -76,7 +76,8 @@ data class ClarivaRegisterRequest(
 
 @Serializable
 data class ClarivaLoginRequest(
-    @SerialName("email") val email: String,
+    // Email address OR username - the API accepts either.
+    @SerialName("identifier") val identifier: String,
     @SerialName("password") val password: String,
 )
 

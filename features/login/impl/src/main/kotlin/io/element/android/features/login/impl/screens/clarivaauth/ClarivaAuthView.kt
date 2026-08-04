@@ -329,16 +329,24 @@ private fun ClarivaAuthForm(
         }
 
         TextField(
-            label = stringResource(R.string.clariva_auth_email_label),
+            // Sign-in resolves an email OR a username; sign-up must be an email,
+            // since that is what identifies the account afterwards.
+            label = stringResource(
+                if (isSignUp) R.string.clariva_auth_email_label else R.string.clariva_auth_identifier_label
+            ),
             value = state.email,
             enabled = !state.isLoading,
             onValueChange = { eventSink(ClarivaAuthEvents.SetEmail(it.sanitize())) },
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("clariva-auth-email"),
-            placeholder = stringResource(R.string.clariva_auth_email_placeholder),
+            placeholder = stringResource(
+                if (isSignUp) R.string.clariva_auth_email_placeholder else R.string.clariva_auth_identifier_placeholder
+            ),
             keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Email,
+                // Plain text on sign-in: the email keyboard hides letters behind
+                // an '@'-first layout, which is wrong for a username.
+                keyboardType = if (isSignUp) KeyboardType.Email else KeyboardType.Text,
                 imeAction = ImeAction.Next,
             ),
             keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),

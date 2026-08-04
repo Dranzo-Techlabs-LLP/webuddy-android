@@ -131,7 +131,8 @@ class ClarivaAuthPresenter(
                                 isConsultant = isConsultant,
                             )
                             ClarivaAuthMode.SignIn -> clarivaAuthService.signInWithEmail(
-                                email = email,
+                                // Holds an email OR a username on the sign-in screen.
+                                identifier = email,
                                 password = password,
                             )
                         }

@@ -143,8 +143,13 @@ class PreferencesRootPresenter(
             deviceId = matrixClient.deviceId,
             isMultiAccountEnabled = isMultiAccountEnabled,
             otherSessions = otherSessions,
-            showSecureBackup = !canVerifyUserSession,
-            showSecureBackupBadge = showSecureBackupIndicator,
+            // Clariva: hidden. Key storage is provisioned automatically at
+            // sign-in from a backend-derived passphrase, and this screen would
+            // replace it with one locked by a key the server does not know -
+            // locking every other device out of the key backup. See
+            // RoomListPresenter.calculateBannerState for the full reasoning.
+            showSecureBackup = false,
+            showSecureBackupBadge = false,
             accountManagementUrl = accountManagementUrl.value,
             devicesManagementUrl = devicesManagementUrl.value,
             showAnalyticsSettings = hasAnalyticsProviders,

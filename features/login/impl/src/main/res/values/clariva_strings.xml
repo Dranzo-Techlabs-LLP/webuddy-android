@@ -27,6 +27,9 @@
     <string name="clariva_auth_username_available">Available — you will be @%1$s:clarivahub.com</string>
     <string name="clariva_auth_email_label">Email</string>
     <string name="clariva_auth_email_placeholder">you@example.com</string>
+    <!-- Sign-in accepts either; sign-up still asks for an email specifically. -->
+    <string name="clariva_auth_identifier_label">Email or username</string>
+    <string name="clariva_auth_identifier_placeholder">you@example.com or jane.doe</string>
     <string name="clariva_auth_password_label">Password</string>
     <string name="clariva_auth_password_hint">At least %1$d characters</string>
     <string name="clariva_auth_show_password">Show password</string>

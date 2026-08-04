@@ -84,8 +84,9 @@ class ClarivaAuthService(
         )
     }
 
-    suspend fun signInWithEmail(email: String, password: String): Result<Credentials> = runAuth {
-        clarivaAuthApi.login(ClarivaLoginRequest(email = email.trim(), password = password))
+    /** [identifier] is an email address or a username; the API resolves either. */
+    suspend fun signInWithEmail(identifier: String, password: String): Result<Credentials> = runAuth {
+        clarivaAuthApi.login(ClarivaLoginRequest(identifier = identifier.trim(), password = password))
     }
 
     /**

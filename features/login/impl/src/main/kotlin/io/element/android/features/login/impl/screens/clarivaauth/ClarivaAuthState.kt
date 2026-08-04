@@ -97,9 +97,15 @@ data class ClarivaAuthState(
         }
 
     private val credentialsValid: Boolean
-        get() = email.contains('@') &&
-            email.length >= 5 &&
-            password.length >= MIN_PASSWORD_LENGTH
+        get() = when (mode) {
+            // Sign-in accepts an email OR a username, so requiring '@' here
+            // would leave the button permanently disabled for username sign-in.
+            ClarivaAuthMode.SignIn -> email.length >= MIN_USERNAME_LENGTH &&
+                password.length >= MIN_PASSWORD_LENGTH
+            ClarivaAuthMode.SignUp -> email.contains('@') &&
+                email.length >= 5 &&
+                password.length >= MIN_PASSWORD_LENGTH
+        }
 
     val submitEnabled: Boolean
         get() = !isLoading && credentialsValid && when (mode) {
