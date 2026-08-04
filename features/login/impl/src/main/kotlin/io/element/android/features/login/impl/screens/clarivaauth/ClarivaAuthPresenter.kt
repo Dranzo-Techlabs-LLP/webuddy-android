@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (c) 2026 Element Creations Ltd.
  *
  * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial.
@@ -22,13 +22,16 @@ import io.element.android.appconfig.OnBoardingConfig
 import io.element.android.libraries.architecture.AsyncData
 import io.element.android.libraries.architecture.Presenter
 import io.element.android.libraries.core.meta.BuildMeta
+import io.element.android.libraries.di.annotations.AppCoroutineScope
 import io.element.android.libraries.matrix.api.MatrixClientProvider
 import io.element.android.libraries.matrix.api.auth.MatrixAuthenticationService
 import io.element.android.libraries.matrix.api.auth.external.ExternalSession
 import io.element.android.libraries.matrix.api.core.SessionId
+import io.element.android.libraries.matrix.api.encryption.RecoveryException
 import io.element.android.libraries.matrix.api.encryption.RecoveryState
 import io.element.android.libraries.network.wallet.ClarivaAuthService
 import io.element.android.libraries.sessionstorage.api.SessionStore
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -50,6 +53,11 @@ class ClarivaAuthPresenter(
     private val buildMeta: BuildMeta,
     private val sessionStore: SessionStore,
     private val matrixClientProvider: MatrixClientProvider,
+    // Key storage setup MUST outlive this screen: importing the session makes
+    // RootFlowNode navigate away immediately, disposing the composition and
+    // cancelling rememberCoroutineScope() mid-request.
+    @AppCoroutineScope
+    private val appCoroutineScope: CoroutineScope,
 ) : Presenter<ClarivaAuthState> {
     @Composable
     override fun present(): ClarivaAuthState {
@@ -288,7 +296,25 @@ class ClarivaAuthPresenter(
                 // the server passphrase so every later device can open it.
                 RecoveryState.DISABLED -> {
                     Timber.d("Setting up key storage for the first time")
-                    encryption.enableRecovery(waitForBackupsToUpload = false, passphrase = passphrase).getOrThrow()
+                    val setup = encryption.enableRecovery(waitForBackupsToUpload = false, passphrase = passphrase)
+                    if (setup.exceptionOrNull() is RecoveryException.BackupExistsOnServer) {
+                        // An ORPHANED backup: created automatically before key
+                        // storage existed, so its key was only ever in the local
+                        // store of whichever device made it and is not in secret
+                        // storage. No other device can read it and the SDK refuses
+                        // to overwrite it, so without replacing it this account
+                        // could never gain key storage at all.
+                        //
+                        // Safe to replace: this branch only runs while secret
+                        // storage does not exist, and any device still holding
+                        // room keys re-uploads them to the new backup. Only the
+                        // unreadable blob is discarded.
+                        Timber.w("Replacing an orphaned key backup that predates key storage")
+                        encryption.disableRecovery().getOrThrow()
+                        encryption.enableRecovery(waitForBackupsToUpload = false, passphrase = passphrase).getOrThrow()
+                    } else {
+                        setup.getOrThrow()
+                    }
                 }
                 // Secret storage already exists - unlock it to obtain the backup
                 // and cross-signing keys. INCOMPLETE means exactly that: present
@@ -321,7 +347,10 @@ class ClarivaAuthPresenter(
                 )
             ).getOrThrow()
 
-            unlockKeyStorage(sessionId, credentials.recoveryPassphrase)
+            // Not awaited: setup takes several seconds and the user should not
+            // wait on it. It runs on the app scope so navigating away from this
+            // screen does not cancel it half-done.
+            appCoroutineScope.launch { unlockKeyStorage(sessionId, credentials.recoveryPassphrase) }
 
             // NOTE: mandatory session verification is skipped for Clariva sessions in
             // DefaultFtueService (canSkipVerification), not here. Clariva accounts are

@@ -1,4 +1,4 @@
-import extension.setupDependencyInjection
+﻿import extension.setupDependencyInjection
 import extension.testCommonDependencies
 
 /*
@@ -32,6 +32,7 @@ dependencies {
     implementation(projects.features.enterprise.api)
     implementation(projects.features.rageshake.api)
     implementation(projects.libraries.core)
+    implementation(projects.libraries.di)
     implementation(projects.libraries.androidutils)
     implementation(projects.libraries.architecture)
     implementation(projects.libraries.featureflag.api)

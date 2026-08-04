@@ -138,7 +138,16 @@ class RustMatrixClientFactory(
             .setSessionDelegate(sessionDelegate)
             .userAgent(userAgentProvider.provide())
             .addRootCertificates(userCertificatesProvider.provides())
-            .autoEnableBackups(true)
+            // Clariva: the SDK must NOT create the key backup on its own.
+            //
+            // Clariva sets up recovery itself at sign-in, locked with a
+            // server-held passphrase, so every device can read history without
+            // the user verifying anything (ClarivaAuthPresenter.unlockKeyStorage).
+            // enableRecovery() creates the backup AND secret storage together and
+            // refuses to run if a backup already exists (BackupExistsOnServer) -
+            // so letting the SDK auto-create one first permanently blocks setup
+            // and leaves the account with a backup nobody holds the key to.
+            .autoEnableBackups(false)
             .autoEnableCrossSigning(true)
             .roomKeyRecipientStrategy(
                 strategy = if (featureFlagService.isFeatureEnabled(FeatureFlags.OnlySignedDeviceIsolationMode)) {
