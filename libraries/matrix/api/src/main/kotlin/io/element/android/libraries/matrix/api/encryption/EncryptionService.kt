@@ -25,8 +25,13 @@ interface EncryptionService {
 
     /**
      * Enable recovery. Observe enableProgressStateFlow to get progress and recovery key.
+     *
+     * [passphrase] additionally locks secret storage with a passphrase, so a
+     * device can unlock the key backup from it alone instead of needing the
+     * generated recovery key. Null keeps the upstream behaviour (recovery key
+     * only), which is what the user-facing "Set up recovery" screen wants.
      */
-    suspend fun enableRecovery(waitForBackupsToUpload: Boolean): Result<Unit>
+    suspend fun enableRecovery(waitForBackupsToUpload: Boolean, passphrase: String? = null): Result<Unit>
 
     /**
      * Change the recovery and return the new recovery key.

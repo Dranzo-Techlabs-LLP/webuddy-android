@@ -93,7 +93,7 @@ class FakeEncryptionService(
         return Result.success(FAKE_RECOVERY_KEY)
     }
 
-    override suspend fun enableRecovery(waitForBackupsToUpload: Boolean): Result<Unit> = simulateLongTask {
+    override suspend fun enableRecovery(waitForBackupsToUpload: Boolean, passphrase: String?): Result<Unit> = simulateLongTask {
         return enableRecoveryLambda(waitForBackupsToUpload)
     }
 

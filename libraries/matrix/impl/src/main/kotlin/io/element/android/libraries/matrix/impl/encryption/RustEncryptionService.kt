@@ -131,6 +131,7 @@ class RustEncryptionService(
 
     override suspend fun enableRecovery(
         waitForBackupsToUpload: Boolean,
+        passphrase: String?,
     ): Result<Unit> = withContext(dispatchers.io) {
         runCatchingExceptions {
             service.enableRecovery(
@@ -140,7 +141,7 @@ class RustEncryptionService(
                         enableRecoveryProgressStateFlow.value = enableRecoveryProgressMapper.map(status)
                     }
                 },
-                passphrase = null,
+                passphrase = passphrase,
             )
                 // enableRecovery returns the encryption key, but we read it from the state flow
                 .let { }

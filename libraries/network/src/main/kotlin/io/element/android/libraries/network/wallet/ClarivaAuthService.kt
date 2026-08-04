@@ -44,6 +44,15 @@ class ClarivaAuthService(
         val matrixUserId: String,
         val accessToken: String,
         val deviceId: String,
+        /**
+         * Server-held passphrase for this account's Matrix secret storage.
+         *
+         * Applying it after import gives the device the cross-signing and key
+         * backup secrets, so it becomes trusted and can read history WITHOUT the
+         * user verifying anything. Null on an older API - the session still
+         * works, it just has no access to messages sent before it existed.
+         */
+        val recoveryPassphrase: String? = null,
     )
 
     /** Google sign-in either completes, or stops to ask a new user for their role. */
@@ -126,6 +135,7 @@ class ClarivaAuthService(
                         matrixUserId = session.userId,
                         accessToken = session.accessToken,
                         deviceId = session.deviceId,
+                        recoveryPassphrase = session.recoveryPassphrase,
                     )
                 )
             )
@@ -215,6 +225,7 @@ class ClarivaAuthService(
                     matrixUserId = session.userId,
                     accessToken = session.accessToken,
                     deviceId = session.deviceId,
+                    recoveryPassphrase = session.recoveryPassphrase,
                 )
             )
         } catch (e: HttpException) {

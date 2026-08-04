@@ -157,4 +157,8 @@ data class ClarivaMatrixSessionResponse(
     @SerialName("userId") val userId: String,
     @SerialName("accessToken") val accessToken: String,
     @SerialName("deviceId") val deviceId: String,
+    // Unlocks this account's key backup on ANY device without the user having to
+    // verify it, which is what makes message history follow them. Null on an
+    // older API, in which case the device simply has no history access.
+    @SerialName("recoveryPassphrase") val recoveryPassphrase: String? = null,
 )

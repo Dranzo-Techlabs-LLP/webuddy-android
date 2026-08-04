@@ -22,12 +22,17 @@ import io.element.android.appconfig.OnBoardingConfig
 import io.element.android.libraries.architecture.AsyncData
 import io.element.android.libraries.architecture.Presenter
 import io.element.android.libraries.core.meta.BuildMeta
+import io.element.android.libraries.matrix.api.MatrixClientProvider
 import io.element.android.libraries.matrix.api.auth.MatrixAuthenticationService
 import io.element.android.libraries.matrix.api.auth.external.ExternalSession
+import io.element.android.libraries.matrix.api.core.SessionId
+import io.element.android.libraries.matrix.api.encryption.RecoveryState
 import io.element.android.libraries.network.wallet.ClarivaAuthService
 import io.element.android.libraries.sessionstorage.api.SessionStore
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 
 /**
@@ -44,6 +49,7 @@ class ClarivaAuthPresenter(
     private val authenticationService: MatrixAuthenticationService,
     private val buildMeta: BuildMeta,
     private val sessionStore: SessionStore,
+    private val matrixClientProvider: MatrixClientProvider,
 ) : Presenter<ClarivaAuthState> {
     @Composable
     override fun present(): ClarivaAuthState {
@@ -242,11 +248,70 @@ class ClarivaAuthPresenter(
         )
     }
 
+    /**
+     * Give this device access to the account's key backup, with no user action.
+     *
+     * Clariva users never verify a device, so without this a freshly signed-in
+     * device holds no cross-signing or backup secrets and every message sent
+     * before it existed shows "You need to verify this device for access to
+     * historical messages" forever. The backend derives a stable per-account 4S
+     * passphrase; recovering from it hands this device the same secrets a
+     * verified device would have received, so history opens and the device stops
+     * being flagged as unsigned.
+     *
+     * PRIVACY: the server knows this passphrase, so it can decrypt backed-up
+     * history. That is the accepted cost of "history on any device, no prompts".
+     *
+     * Never fatal: a failure here must not block sign-in - the user just gets a
+     * session without history access, exactly as before this existed.
+     */
+    private suspend fun unlockKeyStorage(sessionId: SessionId, passphrase: String?) {
+        if (passphrase.isNullOrBlank()) {
+            Timber.w("No recovery passphrase from the API; history will be unavailable on this device")
+            return
+        }
+        runCatching {
+            val client = matrixClientProvider.getOrRestore(sessionId).getOrThrow()
+            val encryption = client.encryptionService
+
+            // Recovery must not be touched while the SDK is still working out what
+            // state it is in, or enable/recover races the initial sync.
+            val state = withTimeoutOrNull(RECOVERY_STATE_TIMEOUT) {
+                encryption.recoveryStateStateFlow.first { it != RecoveryState.WAITING_FOR_SYNC && it != RecoveryState.UNKNOWN }
+            } ?: run {
+                Timber.w("Recovery state still settling; skipping key storage unlock")
+                return@runCatching
+            }
+
+            when (state) {
+                // First device for this account: create secret storage locked with
+                // the server passphrase so every later device can open it.
+                RecoveryState.DISABLED -> {
+                    Timber.d("Setting up key storage for the first time")
+                    encryption.enableRecovery(waitForBackupsToUpload = false, passphrase = passphrase).getOrThrow()
+                }
+                // Secret storage already exists - unlock it to obtain the backup
+                // and cross-signing keys. INCOMPLETE means exactly that: present
+                // on the server, not yet on this device.
+                RecoveryState.ENABLED, RecoveryState.INCOMPLETE -> {
+                    Timber.d("Unlocking existing key storage")
+                    encryption.recover(passphrase).getOrThrow()
+                }
+                else -> Timber.d("Key storage in state $state; nothing to do")
+            }
+            Timber.d("Key storage ready; historical messages should be available")
+        }.onFailure {
+            // Most likely an account whose backup predates secret storage. The
+            // session is still usable; only history is missing.
+            Timber.w(it, "Could not unlock key storage; continuing without history access")
+        }
+    }
+
     private suspend fun importSession(credentials: ClarivaAuthService.Credentials): AsyncData<Unit> {
         return try {
             authenticationService.setHomeserver(OnBoardingConfig.DEFAULT_HOMESERVER_URL).getOrThrow()
 
-            authenticationService.importCreatedSession(
+            val sessionId = authenticationService.importCreatedSession(
                 ExternalSession(
                     userId = credentials.matrixUserId,
                     deviceId = credentials.deviceId,
@@ -255,6 +320,8 @@ class ClarivaAuthPresenter(
                     homeserverUrl = MATRIX_HOMESERVER_URL,
                 )
             ).getOrThrow()
+
+            unlockKeyStorage(sessionId, credentials.recoveryPassphrase)
 
             // NOTE: mandatory session verification is skipped for Clariva sessions in
             // DefaultFtueService (canSkipVerification), not here. Clariva accounts are
@@ -280,5 +347,12 @@ class ClarivaAuthPresenter(
 
         /** Long enough that a normal typist triggers one lookup per handle, not one per key. */
         const val USERNAME_CHECK_DEBOUNCE_MS = 450L
+
+        /**
+         * How long to wait for the SDK to report a settled recovery state.
+         * Bounded so a slow or offline first sync delays sign-in briefly rather
+         * than hanging it - history access is retried on the next sign-in.
+         */
+        const val RECOVERY_STATE_TIMEOUT = 20_000L
     }
 }
