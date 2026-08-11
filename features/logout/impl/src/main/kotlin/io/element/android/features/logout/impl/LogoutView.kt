@@ -86,16 +86,14 @@ fun LogoutView(
 @Composable
 private fun title(state: LogoutState): String {
     return when {
+        // A backup is still uploading - this warning is legitimate on Clariva
+        // too: keys not yet on the server would not come back after sign-out.
         state.backupUploadState.isBackingUp() -> stringResource(id = R.string.screen_signout_key_backup_ongoing_title)
-        state.isLastDevice -> {
-            if (state.recoveryState != RecoveryState.ENABLED) {
-                stringResource(id = R.string.screen_signout_recovery_disabled_title)
-            } else if (state.backupState == BackupState.UNKNOWN && state.doesBackupExistOnServer.not()) {
-                stringResource(id = R.string.screen_signout_key_backup_disabled_title)
-            } else {
-                stringResource(id = R.string.screen_signout_save_recovery_key_title)
-            }
-        }
+        // Clariva: key storage is server-managed, so signing out of the last
+        // device never loses access to messages - they are restored on the next
+        // sign-in. The upstream "have you saved your recovery key" warning is
+        // false here, so show a plain, reassuring confirmation instead.
+        state.isLastDevice -> stringResource(id = R.string.clariva_signout_title)
         else -> stringResource(CommonStrings.action_signout)
     }
 }
@@ -106,7 +104,8 @@ private fun subtitle(state: LogoutState): String? {
         (state.backupUploadState as? BackupUploadState.SteadyException)?.exception is SteadyStateException.Connection ->
             stringResource(id = R.string.screen_signout_key_backup_offline_subtitle)
         state.backupUploadState.isBackingUp() -> stringResource(id = R.string.screen_signout_key_backup_ongoing_subtitle)
-        state.isLastDevice -> stringResource(id = R.string.screen_signout_key_backup_disabled_subtitle)
+        // See title(): reassure rather than warn about lost messages.
+        state.isLastDevice -> stringResource(id = R.string.clariva_signout_subtitle)
         else -> null
     }
 }
@@ -118,13 +117,9 @@ private fun ColumnScope.Buttons(
     onChangeRecoveryKeyClick: () -> Unit,
 ) {
     val logoutAction = state.logoutAction
-    if (state.isLastDevice) {
-        OutlinedButton(
-            text = stringResource(id = CommonStrings.common_settings),
-            modifier = Modifier.fillMaxWidth(),
-            onClick = onChangeRecoveryKeyClick,
-        )
-    }
+    // Clariva: no "Settings" shortcut to set up a recovery key here - key storage
+    // is provisioned automatically and the recovery UI is intentionally hidden,
+    // so there is nothing for the user to configure before signing out.
     val signOutSubmitRes = when {
         logoutAction is AsyncAction.Loading -> R.string.screen_signout_in_progress_dialog_content
         state.backupUploadState.isBackingUp() -> CommonStrings.action_signout_anyway
