@@ -102,6 +102,8 @@ fun TimelineView(
     onReadReceiptClick: (TimelineItem.Event) -> Unit,
     onJoinCallClick: () -> Unit,
     modifier: Modifier = Modifier,
+    // Client credit gate propagated to the in-timeline "Call started" join button (feature #3).
+    isCallRestricted: Boolean = false,
     lazyListState: LazyListState = rememberLazyListState(),
     forceJumpToBottomVisibility: Boolean = false,
     nestedScrollConnection: NestedScrollConnection = rememberNestedScrollInteropConnection(),
@@ -184,6 +186,7 @@ fun TimelineView(
                         onReadReceiptClick = onReadReceiptClick,
                         onSwipeToReply = onSwipeToReply,
                         onJoinCallClick = onJoinCallClick,
+                        isCallRestricted = isCallRestricted,
                         eventSink = state.eventSink,
                     )
                 }

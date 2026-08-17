@@ -30,5 +30,7 @@ data class MessageComposerState(
     val isWalletLoaded: Boolean,
     val credits: Int?,
     val maxCredits: Int?,
+    /** True while the "new billable session" warning dialog should be shown before sending. */
+    val showNewSessionWarning: Boolean,
     val eventSink: (MessageComposerEvent) -> Unit,
 )

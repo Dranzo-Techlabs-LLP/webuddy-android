@@ -77,7 +77,6 @@ import kotlinx.collections.immutable.toImmutableList
 fun AdvancedSettingsView(
     state: AdvancedSettingsState,
     onBackClick: () -> Unit,
-    onBankDetailsClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val analyticsService = LocalAnalyticsService.current
@@ -213,107 +212,6 @@ fun AdvancedSettingsView(
                     )
                 }
             }
-        }
-
-        // Local state for the input field to allow smooth typing
-        var maxCreditsInput by remember(state.maxCredits) {
-            mutableStateOf(state.maxCredits?.toString() ?: "")
-        }
-        var isFocused by remember { mutableStateOf(false) }
-
-        // Show error snackbar if wallet action fails
-        LaunchedEffect(state.walletAction) {
-            if (state.walletAction is AsyncAction.Failure) {
-                snackbarDispatcher.post(SnackbarMessage(CommonStrings.common_error))
-                state.eventSink(AdvancedSettingsEvents.ClearWalletActionError)
-            }
-        }
-
-        if (state.isConsultant) PreferenceCategory(
-            title = stringResource(id = CommonStrings.common_wallet),
-            showTopDivider = true,
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Max Credits",
-                    style = ElementTheme.typography.fontBodyLgMedium,
-                    modifier = Modifier.weight(1f)
-                )
-
-                Spacer(modifier = Modifier.width(16.dp))
-
-                if (state.maxCredits == null || state.walletAction.isLoading()) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        strokeWidth = 2.dp,
-                        color = ElementTheme.colors.iconPrimary
-                    )
-                } else {
-                    BasicTextField(
-                        value = maxCreditsInput,
-                        onValueChange = { newValue ->
-                            if (newValue.isEmpty() || newValue.all { it.isDigit() }) {
-                                maxCreditsInput = newValue
-                                newValue.toIntOrNull()?.let {
-                                    state.eventSink(AdvancedSettingsEvents.SetMaxCredits(it))
-                                }
-                            }
-                        },
-                        modifier = Modifier
-                            .width(80.dp)
-                            .onFocusChanged { focusState ->
-                                if (isFocused && !focusState.isFocused) {
-                                    // Focus lost - auto save if changed
-                                    if (maxCreditsInput.isNotEmpty() &&
-                                        maxCreditsInput != (state.originalMaxCredits?.toString() ?: "")) {
-                                        state.eventSink(AdvancedSettingsEvents.SaveMaxCredits)
-                                    }
-                                }
-                                isFocused = focusState.isFocused
-                            }
-                            .border(
-                                width = 1.dp,
-                                color = Color.Black,
-                                shape = RoundedCornerShape(4.dp)
-                            )
-                            .padding(8.dp),
-                        textStyle = ElementTheme.typography.fontBodyLgRegular.copy(
-                            color = ElementTheme.colors.textPrimary,
-                            textAlign = TextAlign.Start
-                        ),
-                        cursorBrush = SolidColor(ElementTheme.colors.iconPrimary),
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Number,
-                            imeAction = ImeAction.Done,
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onDone = {
-                                if (maxCreditsInput.isNotEmpty()) {
-                                    state.eventSink(AdvancedSettingsEvents.SaveMaxCredits)
-                                }
-                            }
-                        ),
-                        singleLine = true,
-                    )
-                }
-            }
-
-            ListItem(
-                headlineContent = {
-                    Text(
-                        text = "Bank Details",
-                        style = ElementTheme.typography.fontBodyLgMedium,
-                        color = ElementTheme.colors.textPrimary,
-                    )
-                },
-                leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Settings())),
-                onClick = onBankDetailsClick
-            )
         }
 
         ModerationAndSafety(state)
@@ -457,7 +355,6 @@ private fun ContentToPreview(state: AdvancedSettingsState) {
     AdvancedSettingsView(
         state = state,
         onBackClick = { },
-        onBankDetailsClick = { },
     )
 }
 

@@ -19,6 +19,8 @@ interface CallWidgetProvider {
         clientId: String,
         languageTag: String?,
         theme: String?,
+        // Voice-call intent: best-effort request to Element Call to start with the camera off.
+        startWithVideoMuted: Boolean = false,
     ): Result<GetWidgetResult>
 
     data class GetWidgetResult(

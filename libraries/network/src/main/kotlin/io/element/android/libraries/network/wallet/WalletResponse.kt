@@ -115,6 +115,8 @@ data class PendingHoldStatusResponse(
     @SerialName("id") val id: JsonElement? = null, // Fallback to DB-level id field
     @SerialName("clientId") val clientId: String? = null,
     @SerialName("consultantId") val consultantId: String? = null,
+    /** The held amount for this pair. Lets the consultant bound the partial-refund input. */
+    @SerialName("amount") val amount: Double? = null,
     @SerialName("refundRequestId") val refundRequestId: JsonElement? = null,
     /**
      * Set when the consultant didn't respond to a refund request within 24h and the
@@ -165,6 +167,13 @@ data class ClaimAutoApprovalResponse(
 data class ApproveRefundRequest(
     @SerialName("refundRequestId") val refundRequestId: String,
     @SerialName("pendingHoldId") val pendingHoldId: String,
+    /**
+     * Optional. When set, this is a PARTIAL refund: only this amount is returned to the client
+     * and the consultant keeps the remainder (credited immediately). Omitted/null => full refund.
+     * kotlinx-serialization skips null defaults, so a full refund emits no field and the backend
+     * treats the absent field as a full refund.
+     */
+    @SerialName("refundAmount") val refundAmount: Double? = null,
 )
 
 @Serializable

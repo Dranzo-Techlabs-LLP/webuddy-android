@@ -35,6 +35,7 @@ class DefaultCallWidgetProvider(
         clientId: String,
         languageTag: String?,
         theme: String?,
+        startWithVideoMuted: Boolean,
     ): Result<CallWidgetProvider.GetWidgetResult> = runCatchingExceptions {
         val matrixClient = matrixClientsProvider.getOrRestore(sessionId).getOrThrow()
         val room = activeRoomsHolder.getActiveRoomMatching(sessionId, roomId)
@@ -52,12 +53,17 @@ class DefaultCallWidgetProvider(
             direct = room.isDm(),
             hasActiveCall = roomInfo.hasRoomCall,
         )
-        val callUrl = room.generateWidgetWebViewUrl(
+        val generatedUrl = room.generateWidgetWebViewUrl(
             widgetSettings = widgetSettings,
             clientId = clientId,
             languageTag = languageTag,
             theme = theme,
         ).getOrThrow()
+
+        // Voice call: best-effort request that Element Call start with the camera off. Element Call
+        // reads media defaults from the widget-URL fragment; appending `video=false` is harmless if
+        // the embedded EC build ignores it (the pre-join lobby still lets the user pick devices).
+        val callUrl = if (startWithVideoMuted) appendVideoMutedParam(generatedUrl) else generatedUrl
 
         val driver = room.getWidgetDriver(widgetSettings).getOrThrow()
 
@@ -65,5 +71,19 @@ class DefaultCallWidgetProvider(
             driver = driver,
             url = callUrl,
         )
+    }
+
+    /**
+     * Append `video=false` to the Element Call widget URL's fragment query so the call starts with
+     * the camera off. Element Call places its parameters in the fragment as a query string
+     * (`…index.html#?a=1&b=2`); we add to that when present, or create it otherwise.
+     */
+    private fun appendVideoMutedParam(url: String): String {
+        val hashIndex = url.indexOf('#')
+        return when {
+            hashIndex == -1 -> "$url#?video=false"
+            url.endsWith("#") -> "${url}?video=false"
+            else -> "$url&video=false"
+        }
     }
 }

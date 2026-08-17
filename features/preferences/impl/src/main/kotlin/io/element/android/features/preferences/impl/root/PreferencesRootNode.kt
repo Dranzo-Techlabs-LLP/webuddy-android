@@ -44,6 +44,7 @@ class PreferencesRootNode(
         fun navigateToNotificationSettings()
         fun navigateToLockScreenSettings()
         fun navigateToAdvancedSettings()
+        fun navigateToBillingAndPayments()
         fun navigateToLabs()
         fun navigateToLinkNewDevice()
         fun navigateToUserProfile(matrixUser: MatrixUser)
@@ -84,6 +85,7 @@ class PreferencesRootNode(
             onSecureBackupClick = callback::navigateToSecureBackup,
             onOpenDeveloperSettings = callback::navigateToDeveloperSettings,
             onOpenAdvancedSettings = callback::navigateToAdvancedSettings,
+            onOpenBillingAndPayments = callback::navigateToBillingAndPayments,
             onOpenLabs = callback::navigateToLabs,
             onLinkNewDeviceClick = callback::navigateToLinkNewDevice,
             onManageAccountClick = { onManageAccountClick(activity, it, isDark) },

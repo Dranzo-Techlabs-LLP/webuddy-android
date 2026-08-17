@@ -152,13 +152,13 @@ class MessagesPresenter(
         // a notification — even when their app is backgrounded or killed. Each mirrors a
         // translatable="false" string in do_not_translate.xml; kept as constants here to avoid
         // threading a Context through MessagesPresenter's AssistedFactory just for three strings.
-        private const val REFUND_REQUEST_CHAT_NOTIFICATION_BODY = "🔔 Refund requested for the held credits"
-        private const val REFUND_APPROVED_CHAT_NOTIFICATION_BODY = "✅ Your refund was approved — credits returned to your wallet"
-        private const val REFUND_REJECTED_CHAT_NOTIFICATION_BODY = "❌ Your refund was rejected by the consultant"
+        private const val REFUND_REQUEST_CHAT_NOTIFICATION_BODY = "Refund requested for the held credits"
+        private const val REFUND_APPROVED_CHAT_NOTIFICATION_BODY = "Your refund was approved — credits returned to your wallet"
+        private const val REFUND_REJECTED_CHAT_NOTIFICATION_BODY = "Your refund was rejected by the consultant"
         // Posted when the server's 24h cron auto-approves an unattended refund. Reads naturally
         // for either reader: the client sees "your refund was auto-approved", the consultant
         // sees "the refund went through automatically because they didn't act in time".
-        private const val REFUND_AUTO_APPROVED_CHAT_NOTIFICATION_BODY = "⚙️ Refund auto-approved after 24h with no response — credits returned to the client"
+        private const val REFUND_AUTO_APPROVED_CHAT_NOTIFICATION_BODY = "Refund auto-approved after 24h with no response — credits returned to the client"
     }
 
     // Chat-local toast channel. Refund-flow snackbars (request sent / approved / rejected / failed)
@@ -255,6 +255,7 @@ class MessagesPresenter(
         val refundRequestId = remember { mutableStateOf<String?>(null) }
         val isConsultantInThisRoom = remember { mutableStateOf(false) }
         val isRefundButtonVisible = remember { mutableStateOf(false) }
+        val refundHeldAmount = remember { mutableStateOf<Double?>(null) }
         val isRefundRequestInProgress = remember { mutableStateOf(false) }
         val notifiedRefundRequestIds = remember { mutableSetOf<String>() }
         val otherUserId = dmRoomMember?.userId?.value
@@ -274,6 +275,7 @@ class MessagesPresenter(
                             refundStatus.value = status.refundStatus
                             pendingHoldId.value = status.holdIdString
                             refundRequestId.value = status.refundRequestIdString
+                            refundHeldAmount.value = status.amount
                             isRefundButtonVisible.value = true
 
                             // The in-chat RefundRequestBanner at the top is the consultant's signal
@@ -292,6 +294,7 @@ class MessagesPresenter(
                             refundStatus.value = null
                             pendingHoldId.value = null
                             refundRequestId.value = null
+                            refundHeldAmount.value = null
                         }
 
                         // Auto-approval push-notification pickup: when the cron auto-approves an
@@ -487,10 +490,12 @@ class MessagesPresenter(
                         Timber.w("[Refund] Cannot approve: reqId=$reqId, holdId=$holdId")
                         return
                     }
+                    // null => full refund; a positive value is a partial refund (consultant keeps the rest).
+                    val refundAmount = event.refundAmount
                     localCoroutineScope.launch {
                         isRefundRequestInProgress.value = true
-                        val result = walletService.approveRefund(reqId, holdId)
-                        result.onSuccess {
+                        val result = walletService.approveRefund(reqId, holdId, refundAmount)
+                        result.onSuccess { response ->
                             refundStatus.value = "approved"
                             isRefundButtonVisible.value = false
                             chatTransientEvents.tryEmit(R.string.screen_messages_refund_approved_announcement)
@@ -504,9 +509,24 @@ class MessagesPresenter(
                             // returned credits are already in the client's wallet, and the
                             // existing 15s status poll / chat-list refresh will surface the
                             // change next time the client opens the app.
+                            //
+                            // For a PARTIAL refund, state the actual amount returned so the client
+                            // isn't misled into thinking the whole hold came back. Full refunds keep
+                            // the generic wording.
+                            val returnedAmount = response.amount ?: refundAmount
+                            val approvalBody = if (refundAmount != null && returnedAmount != null) {
+                                val amtStr = if (returnedAmount % 1.0 == 0.0) {
+                                    returnedAmount.toLong().toString()
+                                } else {
+                                    returnedAmount.toString()
+                                }
+                                "Your refund was approved — $amtStr credits returned to your wallet"
+                            } else {
+                                REFUND_APPROVED_CHAT_NOTIFICATION_BODY
+                            }
                             runCatchingExceptions {
                                 room.liveTimeline.sendMessage(
-                                    body = REFUND_APPROVED_CHAT_NOTIFICATION_BODY,
+                                    body = approvalBody,
                                     htmlBody = null,
                                     intentionalMentions = emptyList(),
                                 )
@@ -591,6 +611,7 @@ class MessagesPresenter(
             isRefundButtonVisible = isRefundButtonVisible.value,
             isConsultantInThisRoom = isConsultantInThisRoom.value,
             refundRequestId = refundRequestId.value,
+            refundHeldAmount = refundHeldAmount.value,
             chatTransientEvents = chatTransientEvents,
             eventSink = ::handleEvent,
         )

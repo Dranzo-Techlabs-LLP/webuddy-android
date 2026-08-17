@@ -33,6 +33,7 @@ import io.element.android.libraries.matrix.api.core.UserId
 import io.element.android.libraries.matrix.api.oidc.AccountManagementAction
 import io.element.android.libraries.matrix.api.user.MatrixUser
 import io.element.android.libraries.matrix.api.verification.SessionVerificationService
+import io.element.android.libraries.network.wallet.WalletService
 import io.element.android.libraries.sessionstorage.api.SessionStore
 import io.element.android.services.analytics.api.AnalyticsService
 import kotlinx.collections.immutable.persistentListOf
@@ -56,6 +57,7 @@ class PreferencesRootPresenter(
     private val rageshakeFeatureAvailability: RageshakeFeatureAvailability,
     private val featureFlagService: FeatureFlagService,
     private val sessionStore: SessionStore,
+    private val walletService: WalletService,
 ) : Presenter<PreferencesRootState> {
     @Composable
     override fun present(): PreferencesRootState {
@@ -118,6 +120,11 @@ class PreferencesRootPresenter(
 
         val showLabsItem = remember { featureFlagService.getAvailableFeatures(isInLabs = true).isNotEmpty() }
 
+        // Consultant-only: the Billing and Payments entry (wallet + bank details) is hidden for
+        // regular clients. Null (unknown) role is treated as not-consultant so the entry stays hidden
+        // until we positively confirm the consultant role.
+        val isCurrentUserConsultant by walletService.isCurrentUserConsultant.collectAsState()
+
         val directLogoutState = directLogoutPresenter.present()
 
         LaunchedEffect(Unit) {
@@ -159,6 +166,7 @@ class PreferencesRootPresenter(
             canDeactivateAccount = canDeactivateAccount,
             showBlockedUsersItem = showBlockedUsersItem,
             showLabsItem = showLabsItem,
+            showBillingAndPayments = isCurrentUserConsultant == true,
             directLogoutState = directLogoutState,
             snackbarMessage = snackbarMessage,
             eventSink = ::handleEvent,

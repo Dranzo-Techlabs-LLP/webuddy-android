@@ -33,6 +33,7 @@ class InMemorySessionPreferencesStore(
     private val doesCompressMedia = MutableStateFlow(doesCompressMedia)
     private val videoCompressionPreset = MutableStateFlow(videoCompressionPreset)
     private val maxCredits = MutableStateFlow(maxCredits)
+    private val dismissedNewSessionWarningConsultants = MutableStateFlow<Set<String>>(emptySet())
     var clearCallCount = 0
         private set
 
@@ -91,6 +92,16 @@ class InMemorySessionPreferencesStore(
     }
 
     override fun getMaxCredits(): Flow<Int?> = maxCredits
+
+    override suspend fun setNewSessionWarningDismissed(consultantId: String, dismissed: Boolean) {
+        dismissedNewSessionWarningConsultants.value = if (dismissed) {
+            dismissedNewSessionWarningConsultants.value + consultantId
+        } else {
+            dismissedNewSessionWarningConsultants.value - consultantId
+        }
+    }
+
+    override fun dismissedNewSessionWarningConsultants(): Flow<Set<String>> = dismissedNewSessionWarningConsultants
 
     override suspend fun clear() {
         clearCallCount++

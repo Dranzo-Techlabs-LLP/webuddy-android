@@ -38,5 +38,13 @@ interface SessionPreferencesStore {
     suspend fun setMaxCredits(maxCredits: Int)
     fun getMaxCredits(): Flow<Int?>
 
+    /**
+     * Per-consultant opt-out for the "new billable session" warning. When a consultant's Matrix id
+     * is in this set, the client has ticked "never remind me again" for that consultant and the
+     * warning is suppressed for future new sessions with them.
+     */
+    suspend fun setNewSessionWarningDismissed(consultantId: String, dismissed: Boolean)
+    fun dismissedNewSessionWarningConsultants(): Flow<Set<String>>
+
     suspend fun clear()
 }

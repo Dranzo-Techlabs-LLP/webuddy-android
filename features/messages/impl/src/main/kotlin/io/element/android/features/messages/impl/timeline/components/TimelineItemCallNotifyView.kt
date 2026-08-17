@@ -47,7 +47,10 @@ internal fun TimelineItemCallNotifyView(
     roomCallState: RoomCallState,
     onLongClick: (TimelineItem.Event) -> Unit,
     onJoinCallClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // Same client credit gate as the top-bar call button: a client who can't afford the consultant
+    // must not be able to join an ongoing call from this in-timeline tile either.
+    isCallRestricted: Boolean = false,
 ) {
     Row(
         modifier = modifier
@@ -98,6 +101,7 @@ internal fun TimelineItemCallNotifyView(
             CallMenuItem(
                 roomCallState = roomCallState,
                 onJoinCallClick = onJoinCallClick,
+                isCallRestricted = isCallRestricted,
             )
         } else {
             Text(

@@ -158,6 +158,11 @@ class MessageComposerPresenter(
         val recipientMaxCredits by recipientMaxCreditsState.collectAsState()
         val holdExists by holdExistsState.collectAsState()
         val isCurrentUserConsultant by walletService.isCurrentUserConsultant.collectAsState()
+        val dismissedNewSessionWarningConsultants by remember {
+            sessionPreferencesStore.dismissedNewSessionWarningConsultants()
+        }.collectAsState(initial = emptySet())
+        // Visible while the "new billable session" warning dialog is shown (before actually sending).
+        var showNewSessionWarning by remember { mutableStateOf(false) }
         val roomInfo by room.roomInfoFlow.collectAsState()
         val membersState by room.membersStateFlow.collectAsState()
         val otherUserId = remember(roomInfo, membersState) { membersState.getDirectRoomMember(roomInfo, room.sessionId)?.userId?.value }
@@ -307,10 +312,57 @@ class MessageComposerPresenter(
                     }
                 }
                 is MessageComposerEvent.SendMessage -> {
+                    // Warn the client before starting a NEW billable session: no active hold means
+                    // this send creates a fresh 24h hold (a new charge). Skipped for consultants,
+                    // when a hold already covers the chat, or when the client opted out for this
+                    // consultant. The composer text is left intact so the send can proceed on confirm.
+                    val peer = otherUserId
+                    val optedOut = peer != null && peer in dismissedNewSessionWarningConsultants
+                    val isClient = isCurrentUserConsultant != true
+                    if (peer == null || !isClient || optedOut) {
+                        sessionCoroutineScope.sendMessage(
+                            markdownTextEditorState = markdownTextEditorState,
+                            richTextEditorState = richTextEditorState,
+                        )
+                    } else {
+                        when (holdExists) {
+                            false -> showNewSessionWarning = true
+                            true -> sessionCoroutineScope.sendMessage(
+                                markdownTextEditorState = markdownTextEditorState,
+                                richTextEditorState = richTextEditorState,
+                            )
+                            // Hold state not yet known (still loading, or a prior check errored to
+                            // null): resolve it NOW so the warning isn't silently skipped on the very
+                            // first send of a fresh session. false => warn; true/null => just send.
+                            null -> sessionCoroutineScope.launch {
+                                val exists = walletService.checkHoldExists(room.sessionId.value, peer)
+                                holdExistsState.value = exists
+                                if (exists == false) {
+                                    showNewSessionWarning = true
+                                } else {
+                                    sessionCoroutineScope.sendMessage(
+                                        markdownTextEditorState = markdownTextEditorState,
+                                        richTextEditorState = richTextEditorState,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                is MessageComposerEvent.ConfirmNewSession -> {
+                    showNewSessionWarning = false
+                    if (event.neverRemindAgain && otherUserId != null) {
+                        sessionCoroutineScope.launch {
+                            sessionPreferencesStore.setNewSessionWarningDismissed(otherUserId, true)
+                        }
+                    }
                     sessionCoroutineScope.sendMessage(
                         markdownTextEditorState = markdownTextEditorState,
                         richTextEditorState = richTextEditorState,
                     )
+                }
+                MessageComposerEvent.DismissNewSessionWarning -> {
+                    showNewSessionWarning = false
                 }
                 is MessageComposerEvent.SendUri -> {
                     val inReplyToEventId = (messageComposerContext.composerMode as? MessageComposerMode.Reply)?.eventId
@@ -471,6 +523,7 @@ class MessageComposerPresenter(
             isWalletLoaded = isWalletLoaded,
             credits = credits,
             maxCredits = recipientMaxCredits,
+            showNewSessionWarning = showNewSessionWarning,
             eventSink = ::handleEvent,
         )
     }
@@ -569,7 +622,7 @@ class MessageComposerPresenter(
             }
         }
 
-        initiateHoldIfNeeded()
+        val holdJob = initiateHoldIfNeeded()
 
         val roomInfo = room.info()
         val roomMembers = room.membersStateFlow.value
@@ -592,7 +645,9 @@ class MessageComposerPresenter(
             )
         )
 
-        // Refresh wallet balance after sending a message to ensure real-time restriction
+        // Refresh wallet balance after sending a message to ensure real-time restriction.
+        // Wait for the hold to land first so the fetched balance reflects the debit.
+        holdJob.join()
         val myUserId = room.sessionId.value
         val currentRoomInfo = room.info()
         val currentMembersState = room.membersStateFlow.value
@@ -815,18 +870,20 @@ class MessageComposerPresenter(
         }
     }
 
-    private fun CoroutineScope.initiateHoldIfNeeded() {
-        launch {
-            val roomInfo = room.roomInfoFlow.value
-            if (roomInfo.isDm) {
-                val members = room.membersStateFlow.value
-                val otherUserId = members.getDirectRoomMember(roomInfo, room.sessionId)?.userId?.value
-                if (otherUserId != null) {
-                    walletService.initiateHold(
-                        clientId = room.sessionId.value,
-                        consultantId = otherUserId
-                    )
-                }
+    // Returns the Job so the caller can await the hold (and therefore the balance
+    // debit) landing on the backend before it refreshes the displayed balance.
+    // Without awaiting, refreshBalance races the hold and reads the pre-debit value,
+    // so the deduction only appears on the next refresh.
+    private fun CoroutineScope.initiateHoldIfNeeded() = launch {
+        val roomInfo = room.roomInfoFlow.value
+        if (roomInfo.isDm) {
+            val members = room.membersStateFlow.value
+            val otherUserId = members.getDirectRoomMember(roomInfo, room.sessionId)?.userId?.value
+            if (otherUserId != null) {
+                walletService.initiateHold(
+                    clientId = room.sessionId.value,
+                    consultantId = otherUserId
+                )
             }
         }
     }

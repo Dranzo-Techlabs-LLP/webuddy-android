@@ -25,7 +25,8 @@ class FakeCallWidgetProvider(
         roomId: RoomId,
         clientId: String,
         languageTag: String?,
-        theme: String?
+        theme: String?,
+        startWithVideoMuted: Boolean,
     ): Result<CallWidgetProvider.GetWidgetResult> {
         getWidgetCalled = true
         return Result.success(

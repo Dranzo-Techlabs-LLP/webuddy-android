@@ -8,15 +8,24 @@
 
 package io.element.android.features.messages.impl.timeline.components
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.PreviewParameter
@@ -37,6 +46,13 @@ internal fun CallMenuItem(
     roomCallState: RoomCallState,
     onJoinCallClick: () -> Unit,
     modifier: Modifier = Modifier,
+    // When non-null, tapping the "start a call" button opens a voice/video chooser and reports the
+    // choice here (true = video / camera on, false = voice / camera off) instead of calling
+    // onJoinCallClick. Only wired for the DM chat top bar; other callers keep the direct behaviour.
+    onStartCallWithType: ((videoEnabled: Boolean) -> Unit)? = null,
+    // Client credit gate: when true the client cannot afford the consultant, so the call button is
+    // disabled — mirroring how the chat composer is restricted. Never true for the consultant.
+    isCallRestricted: Boolean = false,
 ) {
     when (roomCallState) {
         RoomCallState.Unavailable -> {
@@ -46,6 +62,8 @@ internal fun CallMenuItem(
             StandByCallMenuItem(
                 roomCallState = roomCallState,
                 onJoinCallClick = onJoinCallClick,
+                onStartCallWithType = onStartCallWithType,
+                isCallRestricted = isCallRestricted,
                 modifier = modifier,
             )
         }
@@ -53,6 +71,7 @@ internal fun CallMenuItem(
             OnGoingCallMenuItem(
                 roomCallState = roomCallState,
                 onJoinCallClick = onJoinCallClick,
+                isCallRestricted = isCallRestricted,
                 modifier = modifier,
             )
         }
@@ -63,24 +82,102 @@ internal fun CallMenuItem(
 private fun StandByCallMenuItem(
     roomCallState: RoomCallState.StandBy,
     onJoinCallClick: () -> Unit,
+    onStartCallWithType: ((videoEnabled: Boolean) -> Unit)?,
+    isCallRestricted: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    var showChooser by remember { mutableStateOf(false) }
     IconButton(
         modifier = modifier,
-        onClick = onJoinCallClick,
-        enabled = roomCallState.canStartCall,
+        onClick = {
+            if (onStartCallWithType != null) {
+                showChooser = true
+            } else {
+                onJoinCallClick()
+            }
+        },
+        enabled = roomCallState.canStartCall && !isCallRestricted,
     ) {
         Icon(
-            imageVector = CompoundIcons.VideoCallSolid(),
+            // A plain phone icon when the chooser is available (the tap asks voice vs video);
+            // the original video-call icon for the legacy direct-start callers.
+            imageVector = if (onStartCallWithType != null) CompoundIcons.VoiceCall() else CompoundIcons.VideoCallSolid(),
             contentDescription = stringResource(CommonStrings.a11y_start_call),
         )
     }
+
+    if (showChooser && onStartCallWithType != null) {
+        CallTypeChooserDialog(
+            onVoiceCall = {
+                showChooser = false
+                onStartCallWithType(false)
+            },
+            onVideoCall = {
+                showChooser = false
+                onStartCallWithType(true)
+            },
+            onDismiss = { showChooser = false },
+        )
+    }
+}
+
+@Composable
+private fun CallTypeChooserDialog(
+    onVoiceCall: () -> Unit,
+    onVideoCall: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Start a call") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "Choose how you want to call.",
+                    style = ElementTheme.typography.fontBodyMdRegular,
+                    color = ElementTheme.colors.textSecondary,
+                )
+                Button(
+                    onClick = onVoiceCall,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(
+                        imageVector = CompoundIcons.VoiceCall(),
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Voice call")
+                }
+                Button(
+                    onClick = onVideoCall,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(
+                        imageVector = CompoundIcons.VideoCall(),
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Video call")
+                }
+            }
+        },
+        // No affirmative action: the two options above ARE the actions.
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(CommonStrings.action_cancel))
+            }
+        },
+    )
 }
 
 @Composable
 private fun OnGoingCallMenuItem(
     roomCallState: RoomCallState.OnGoing,
     onJoinCallClick: () -> Unit,
+    isCallRestricted: Boolean,
     modifier: Modifier = Modifier,
 ) {
     if (!roomCallState.isUserLocallyInTheCall) {
@@ -92,7 +189,7 @@ private fun OnGoingCallMenuItem(
             ),
             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
             modifier = modifier.heightIn(min = 36.dp),
-            enabled = roomCallState.canJoinCall,
+            enabled = roomCallState.canJoinCall && !isCallRestricted,
         ) {
             Icon(
                 modifier = Modifier.size(20.dp),

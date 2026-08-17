@@ -15,13 +15,13 @@
     <!-- Body of the Matrix message we drop into the room on a refund request, purely so the
          consultant's homeserver-driven push pipeline (Sygnal → FCM) delivers a notification
          like a normal chat message — also leaves an audit row in chat history. -->
-    <string translatable="false" name="screen_messages_refund_request_chat_notification">🔔 Refund requested for the held credits</string>
+    <string translatable="false" name="screen_messages_refund_request_chat_notification">Refund requested for the held credits</string>
     <!-- Same trick for the consultant's decision: dropping a Matrix message into the room makes
          the client's homeserver push the outcome to their device even when the app is closed. -->
-    <string translatable="false" name="screen_messages_refund_approved_chat_notification">✅ Your refund was approved — credits returned to your wallet</string>
-    <string translatable="false" name="screen_messages_refund_rejected_chat_notification">❌ Your refund was rejected by the consultant</string>
+    <string translatable="false" name="screen_messages_refund_approved_chat_notification">Your refund was approved — credits returned to your wallet</string>
+    <string translatable="false" name="screen_messages_refund_rejected_chat_notification">Your refund was rejected by the consultant</string>
     <!-- Posted by whichever app first observes the cron's auto-approval via
          POST /v1/refund/auto-approval-claim. Other party (likely app-closed at this
          moment) gets the push via the normal homeserver → Sygnal → FCM path. -->
-    <string translatable="false" name="screen_messages_refund_auto_approved_chat_notification">⚙️ Refund auto-approved after 24h with no response — credits returned to the client</string>
+    <string translatable="false" name="screen_messages_refund_auto_approved_chat_notification">Refund auto-approved after 24h with no response — credits returned to the client</string>
 </resources>

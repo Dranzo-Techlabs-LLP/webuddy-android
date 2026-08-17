@@ -122,7 +122,7 @@ class ThreadedMessagesNode(
         fun navigateToSendLocation()
         fun navigateToCreatePoll()
         fun navigateToEditPoll(eventId: EventId)
-        fun navigateToRoomCall(roomId: RoomId)
+        fun navigateToRoomCall(roomId: RoomId, startWithVideoMuted: Boolean = false)
         fun navigateToThread(threadRootId: ThreadId, focusedEventId: EventId?)
     }
 

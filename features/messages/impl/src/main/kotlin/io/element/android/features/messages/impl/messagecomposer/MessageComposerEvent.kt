@@ -37,4 +37,14 @@ sealed interface MessageComposerEvent {
     data class InsertSuggestion(val resolvedSuggestion: ResolvedSuggestion) : MessageComposerEvent
     data object SaveDraft : MessageComposerEvent
     data object RefreshWallet : MessageComposerEvent
+
+    /**
+     * The client confirmed the "new billable session" warning and wants the pending message sent.
+     * [neverRemindAgain] true persists a per-consultant opt-out so the warning won't show again for
+     * this consultant.
+     */
+    data class ConfirmNewSession(val neverRemindAgain: Boolean) : MessageComposerEvent
+
+    /** The client dismissed the "new billable session" warning; the pending message is discarded. */
+    data object DismissNewSessionWarning : MessageComposerEvent
 }

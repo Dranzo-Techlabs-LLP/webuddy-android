@@ -443,11 +443,17 @@ class WalletService @Inject constructor(
         }
     }
 
-    suspend fun checkHoldExists(clientId: String, consultantId: String): Boolean {
+    /**
+     * Whether an active hold exists between the pair. Returns null on failure (network/parse error)
+     * so callers can distinguish "confirmed no hold" (false) from "unknown" (null). Returning false
+     * on error previously made an ongoing paid session look ended — surfacing a wrong "session ended"
+     * warning and a spurious chat restriction on a transient blip.
+     */
+    suspend fun checkHoldExists(clientId: String, consultantId: String): Boolean? {
         return try {
             val clientData = sessionStore.getSession(clientId)
             val consultantData = sessionStore.getSession(consultantId)
-            
+
             val response = walletApi.checkHoldExists(
                 clientId = clientData?.webuddyName ?: clientId,
                 consultantId = consultantData?.webuddyName ?: consultantId
@@ -455,7 +461,7 @@ class WalletService @Inject constructor(
             response.exists
         } catch (e: Exception) {
             Timber.e(e, "Failed to check hold existence between $clientId and $consultantId")
-            false
+            null
         }
     }
     suspend fun getPendingHoldStatus(clientId: String, consultantId: String): PendingHoldStatusResponse {
@@ -488,10 +494,23 @@ class WalletService @Inject constructor(
         }
     }
 
-    suspend fun approveRefund(refundRequestId: String, pendingHoldId: String): Result<GenericRefundResponse> {
+    /**
+     * Approve a refund. [refundAmount] null => full refund (whole held amount back to the client).
+     * A positive [refundAmount] does a PARTIAL refund: only that much returns to the client and the
+     * consultant keeps the remainder (credited immediately server-side). Must be 0 < amount <= held.
+     */
+    suspend fun approveRefund(
+        refundRequestId: String,
+        pendingHoldId: String,
+        refundAmount: Double? = null,
+    ): Result<GenericRefundResponse> {
         return try {
             val response = walletApi.approveRefund(
-                ApproveRefundRequest(refundRequestId = refundRequestId, pendingHoldId = pendingHoldId)
+                ApproveRefundRequest(
+                    refundRequestId = refundRequestId,
+                    pendingHoldId = pendingHoldId,
+                    refundAmount = refundAmount,
+                )
             )
             Timber.d("Refund approved: ${response.message}")
             Result.success(response)

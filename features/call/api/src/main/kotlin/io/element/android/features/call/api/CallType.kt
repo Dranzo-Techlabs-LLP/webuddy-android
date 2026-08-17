@@ -26,9 +26,15 @@ sealed interface CallType : NodeInputs, Parcelable {
     data class RoomCall(
         val sessionId: SessionId,
         val roomId: RoomId,
+        /**
+         * When true the call is started as a "voice call": the embedded Element Call URL is asked
+         * to start with the camera off (best-effort — the pre-join lobby still lets the user change
+         * it). Element Call has no native audio-only mode, so this is how a voice call is expressed.
+         */
+        val startWithVideoMuted: Boolean = false,
     ) : CallType {
         override fun toString(): String {
-            return "RoomCall(sessionId=$sessionId, roomId=$roomId)"
+            return "RoomCall(sessionId=$sessionId, roomId=$roomId, startWithVideoMuted=$startWithVideoMuted)"
         }
     }
 }

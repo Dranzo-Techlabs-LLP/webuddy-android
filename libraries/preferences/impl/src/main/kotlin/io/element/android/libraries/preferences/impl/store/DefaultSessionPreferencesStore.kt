@@ -15,6 +15,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
 import io.element.android.libraries.androidutils.file.safeDelete
 import io.element.android.libraries.androidutils.hash.hash
@@ -49,6 +50,7 @@ class DefaultSessionPreferencesStore(
     private val compressImages = booleanPreferencesKey("compressMedia")
     private val compressMediaPreset = stringPreferencesKey("compressMediaPreset")
     private val maxCreditsKey = intPreferencesKey("maxCredits")
+    private val newSessionWarningDismissedKey = stringSetPreferencesKey("newSessionWarningDismissedConsultants")
 
     private val dataStoreFile = storeFile(context, sessionId)
     private val store = PreferenceDataStoreFactory.create(
@@ -98,6 +100,16 @@ class DefaultSessionPreferencesStore(
 
     override suspend fun setMaxCredits(maxCredits: Int) = update(maxCreditsKey, maxCredits)
     override fun getMaxCredits(): Flow<Int?> = store.data.map { it[maxCreditsKey] }
+
+    override suspend fun setNewSessionWarningDismissed(consultantId: String, dismissed: Boolean) {
+        store.edit { prefs ->
+            val current = prefs[newSessionWarningDismissedKey] ?: emptySet()
+            prefs[newSessionWarningDismissedKey] = if (dismissed) current + consultantId else current - consultantId
+        }
+    }
+
+    override fun dismissedNewSessionWarningConsultants(): Flow<Set<String>> =
+        store.data.map { it[newSessionWarningDismissedKey] ?: emptySet() }
 
     override suspend fun clear() {
         dataStoreFile.safeDelete()

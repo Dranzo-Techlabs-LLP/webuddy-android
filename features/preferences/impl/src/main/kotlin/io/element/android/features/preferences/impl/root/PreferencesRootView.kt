@@ -61,6 +61,7 @@ fun PreferencesRootView(
     onOpenAbout: () -> Unit,
     onOpenDeveloperSettings: () -> Unit,
     onOpenAdvancedSettings: () -> Unit,
+    onOpenBillingAndPayments: () -> Unit,
     onOpenLabs: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
     onOpenUserProfile: (MatrixUser) -> Unit,
@@ -113,6 +114,7 @@ fun PreferencesRootView(
             onOpenAnalytics = onOpenAnalytics,
             onOpenRageShake = onOpenRageShake,
             onOpenAdvancedSettings = onOpenAdvancedSettings,
+            onOpenBillingAndPayments = onOpenBillingAndPayments,
             onOpenDeveloperSettings = onOpenDeveloperSettings,
             onOpenLabs = onOpenLabs,
             onSignOutClick = onSignOutClick,
@@ -243,6 +245,7 @@ private fun ColumnScope.GeneralSection(
     onOpenAnalytics: () -> Unit,
     onOpenRageShake: () -> Unit,
     onOpenAdvancedSettings: () -> Unit,
+    onOpenBillingAndPayments: () -> Unit,
     onOpenLabs: () -> Unit,
     onOpenDeveloperSettings: () -> Unit,
     onSignOutClick: () -> Unit,
@@ -272,6 +275,15 @@ private fun ColumnScope.GeneralSection(
         leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Settings())),
         onClick = onOpenAdvancedSettings,
     )
+
+    // Consultant-only: wallet (max credits) + bank details live here now.
+    if (state.showBillingAndPayments) {
+        ListItem(
+            headlineContent = { Text("Billing and Payments") },
+            leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Chart())),
+            onClick = onOpenBillingAndPayments,
+        )
+    }
 
     if (state.showLabsItem) {
         ListItem(
@@ -359,6 +371,7 @@ private fun ContentToPreview(matrixUser: MatrixUser) {
         onOpenRageShake = {},
         onOpenDeveloperSettings = {},
         onOpenAdvancedSettings = {},
+        onOpenBillingAndPayments = {},
         onOpenLabs = {},
         onOpenAbout = {},
         onSecureBackupClick = {},

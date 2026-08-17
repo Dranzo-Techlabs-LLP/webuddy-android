@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -71,6 +70,8 @@ internal fun MessagesViewTopBar(
     dmUserIdentityState: IdentityState?,
     onRoomDetailsClick: () -> Unit,
     onJoinCallClick: () -> Unit,
+    onStartCallWithType: ((videoEnabled: Boolean) -> Unit)?,
+    isCallRestricted: Boolean,
     onBackClick: () -> Unit,
     onSummarizeClick: (SummaryDuration?) -> Unit,
     isRefundButtonVisible: Boolean,
@@ -127,22 +128,37 @@ internal fun MessagesViewTopBar(
         actions = {
             // Consultant decision UI lives in the RefundRequestBanner under the top bar.
             if (isRefundButtonVisible && !isConsultantInThisRoom && (refundStatus == "none" || refundStatus == null)) {
-                // Client view: can request refund.
+                // Client view: can request refund. The plain restart icon was unrecognizable, so
+                // the button carries a visible "Refund" label next to it.
                 val showRefundConfirm = remember { mutableStateOf(false) }
+                val iconTint = if (!isRefundRequestInProgress) {
+                    ElementTheme.colors.iconPrimary
+                } else {
+                    ElementTheme.colors.iconDisabled
+                }
+                val labelTint = if (!isRefundRequestInProgress) {
+                    ElementTheme.colors.textPrimary
+                } else {
+                    ElementTheme.colors.textDisabled
+                }
 
-                IconButton(
-                    onClick = { showRefundConfirm.value = true },
-                    enabled = !isRefundRequestInProgress
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(enabled = !isRefundRequestInProgress) { showRefundConfirm.value = true }
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    val iconTint = if (!isRefundRequestInProgress) {
-                        ElementTheme.colors.iconPrimary
-                    } else {
-                        ElementTheme.colors.iconDisabled
-                    }
                     Icon(
                         imageVector = CompoundIcons.Restart(),
-                        contentDescription = "Request Refund",
-                        tint = iconTint
+                        contentDescription = null,
+                        tint = iconTint,
+                    )
+                    Text(
+                        text = "Refund",
+                        style = ElementTheme.typography.fontBodyMdMedium,
+                        color = labelTint,
                     )
                 }
 
@@ -167,6 +183,8 @@ internal fun MessagesViewTopBar(
             CallMenuItem(
                 roomCallState = roomCallState,
                 onJoinCallClick = onJoinCallClick,
+                onStartCallWithType = onStartCallWithType,
+                isCallRestricted = isCallRestricted,
             )
             Spacer(Modifier.width(8.dp))
         },
@@ -238,6 +256,8 @@ internal fun MessagesViewTopBarPreview() = ElementPreview {
         onRejectRefundClick = {},
         onRoomDetailsClick = {},
         onJoinCallClick = {},
+        onStartCallWithType = null,
+        isCallRestricted = false,
         onBackClick = {},
         onSummarizeClick = {},
     )

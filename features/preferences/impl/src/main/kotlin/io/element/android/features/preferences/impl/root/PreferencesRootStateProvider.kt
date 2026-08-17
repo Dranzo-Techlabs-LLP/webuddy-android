@@ -36,6 +36,7 @@ fun aPreferencesRootState(
     showDeveloperSettings = true,
     showBlockedUsersItem = true,
     showLabsItem = true,
+    showBillingAndPayments = true,
     canDeactivateAccount = true,
     snackbarMessage = SnackbarMessage(CommonStrings.common_verification_complete),
     directLogoutState = aDirectLogoutState(),

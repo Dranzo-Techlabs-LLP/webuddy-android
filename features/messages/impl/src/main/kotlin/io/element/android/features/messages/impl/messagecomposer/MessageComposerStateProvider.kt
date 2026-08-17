@@ -36,6 +36,7 @@ fun aMessageComposerState(
     isWalletLoaded: Boolean = true,
     credits: Int? = 150,
     maxCredits: Int? = 100,
+    showNewSessionWarning: Boolean = false,
     eventSink: (MessageComposerEvent) -> Unit = {},
 ) = MessageComposerState(
     textEditorState = textEditorState,
@@ -51,5 +52,6 @@ fun aMessageComposerState(
     isWalletLoaded = isWalletLoaded,
     credits = credits,
     maxCredits = maxCredits,
+    showNewSessionWarning = showNewSessionWarning,
     eventSink = eventSink,
 )

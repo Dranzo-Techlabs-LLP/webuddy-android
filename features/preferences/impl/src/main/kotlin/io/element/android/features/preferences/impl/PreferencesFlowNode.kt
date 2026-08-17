@@ -29,6 +29,7 @@ import io.element.android.features.preferences.impl.about.AboutNode
 import io.element.android.features.preferences.impl.advanced.AdvancedSettingsNode
 import io.element.android.features.preferences.impl.analytics.AnalyticsSettingsNode
 import io.element.android.features.preferences.impl.bankdetails.BankDetailsNode
+import io.element.android.features.preferences.impl.billing.BillingAndPaymentsNode
 import io.element.android.features.preferences.impl.blockedusers.BlockedUsersNode
 import io.element.android.features.preferences.impl.developer.DeveloperSettingsNode
 import io.element.android.features.preferences.impl.labs.LabsNode
@@ -119,6 +120,9 @@ class PreferencesFlowNode(
 
         @Parcelize
         data object BankDetails : NavTarget
+
+        @Parcelize
+        data object BillingAndPayments : NavTarget
     }
 
     private val callback: PreferencesEntryPoint.Callback = callback()
@@ -161,6 +165,10 @@ class PreferencesFlowNode(
 
                     override fun navigateToAdvancedSettings() {
                         backstack.push(NavTarget.AdvancedSettings)
+                    }
+
+                    override fun navigateToBillingAndPayments() {
+                        backstack.push(NavTarget.BillingAndPayments)
                     }
 
                     override fun navigateToLabs() {
@@ -280,12 +288,15 @@ class PreferencesFlowNode(
                 createNode<EditDefaultNotificationSettingNode>(buildContext, plugins = listOf(input, callback))
             }
             NavTarget.AdvancedSettings -> {
-                val callback = object : AdvancedSettingsNode.Callback {
+                createNode<AdvancedSettingsNode>(buildContext)
+            }
+            NavTarget.BillingAndPayments -> {
+                val callback = object : BillingAndPaymentsNode.Callback {
                     override fun navigateToBankDetails() {
                         backstack.push(NavTarget.BankDetails)
                     }
                 }
-                createNode<AdvancedSettingsNode>(buildContext, listOf(callback))
+                createNode<BillingAndPaymentsNode>(buildContext, listOf(callback))
             }
             NavTarget.BankDetails -> {
                 val callback = object : BankDetailsNode.Callback {

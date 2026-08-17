@@ -75,6 +75,8 @@ internal fun TimelineItemRow(
     onJoinCallClick: () -> Unit,
     eventSink: (TimelineEvents.EventFromTimelineItem) -> Unit,
     modifier: Modifier = Modifier,
+    // Client credit gate for the in-timeline "Call started" join button (feature #3).
+    isCallRestricted: Boolean = false,
     eventContentView: @Composable (TimelineItem.Event, Modifier, (ContentAvoidingLayoutData) -> Unit) -> Unit =
         { event, contentModifier, onContentLayoutChange ->
             TimelineItemEventContentView(
@@ -130,6 +132,7 @@ internal fun TimelineItemRow(
                             roomCallState = timelineRoomInfo.roomCallState,
                             onLongClick = onLongClick,
                             onJoinCallClick = onJoinCallClick,
+                            isCallRestricted = isCallRestricted,
                         )
                     }
                     else -> {

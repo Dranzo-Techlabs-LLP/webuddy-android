@@ -125,7 +125,7 @@ class MessagesNode(
         fun navigateToSendLocation()
         fun navigateToCreatePoll()
         fun navigateToEditPoll(eventId: EventId)
-        fun navigateToRoomCall(roomId: RoomId)
+        fun navigateToRoomCall(roomId: RoomId, startWithVideoMuted: Boolean = false)
         fun navigateToThread(threadRootId: ThreadId, focusedEventId: EventId?)
         fun navigateToRoomDetails()
         fun navigateToPinnedMessagesList()
@@ -280,6 +280,11 @@ class MessagesNode(
                 onSendLocationClick = callback::navigateToSendLocation,
                 onCreatePollClick = callback::navigateToCreatePoll,
                 onJoinCallClick = { callback.navigateToRoomCall(room.roomId) },
+                onStartCallWithType = { videoEnabled ->
+                    // Voice = camera off; Video = camera on. Element Call has no audio-only mode,
+                    // so a voice call is a call started with the camera muted.
+                    callback.navigateToRoomCall(room.roomId, startWithVideoMuted = !videoEnabled)
+                },
                 onViewAllPinnedMessagesClick = callback::navigateToPinnedMessagesList,
                 modifier = modifier,
                 knockRequestsBannerView = {

@@ -92,12 +92,16 @@ import io.element.android.services.analyticsproviders.api.trackers.captureIntera
 import kotlinx.collections.immutable.ImmutableList
 import io.element.android.libraries.network.wallet.WalletService
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.parcelize.Parcelize
+import timber.log.Timber
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
 
 @ContributesNode(RoomScope::class)
 @AssistedInject
@@ -277,14 +281,15 @@ class MessagesFlowNode(
                         backstack.push(NavTarget.EditPoll(Timeline.Mode.Live, eventId))
                     }
 
-                    override fun navigateToRoomCall(roomId: RoomId) {
+                    override fun navigateToRoomCall(roomId: RoomId, startWithVideoMuted: Boolean) {
                         val callType = CallType.RoomCall(
                             sessionId = sessionId,
                             roomId = roomId,
+                            startWithVideoMuted = startWithVideoMuted,
                         )
                         analyticsService.captureInteraction(Interaction.Name.MobileRoomCallButton)
-                        // Starting a call bills on the same terms as messaging.
-                        chargeForCallIfNeeded()
+                        // Bills only if/when the other party answers - see chargeForCallWhenAnswered.
+                        chargeForCallWhenAnswered()
                         elementCallEntryPoint.startCall(callType)
                     }
 
@@ -495,14 +500,15 @@ class MessagesFlowNode(
                         backstack.push(NavTarget.EditPoll(Timeline.Mode.Thread(navTarget.threadRootId), eventId))
                     }
 
-                    override fun navigateToRoomCall(roomId: RoomId) {
+                    override fun navigateToRoomCall(roomId: RoomId, startWithVideoMuted: Boolean) {
                         val callType = CallType.RoomCall(
                             sessionId = sessionId,
                             roomId = roomId,
+                            startWithVideoMuted = startWithVideoMuted,
                         )
                         analyticsService.captureInteraction(Interaction.Name.MobileRoomCallButton)
-                        // Starting a call bills on the same terms as messaging.
-                        chargeForCallIfNeeded()
+                        // Bills only if/when the other party answers - see chargeForCallWhenAnswered.
+                        chargeForCallWhenAnswered()
                         elementCallEntryPoint.startCall(callType)
                     }
 
@@ -632,32 +638,58 @@ class MessagesFlowNode(
     }
 
     /**
-     * Charge for starting a call, on the same terms as sending a message.
+     * Charge for a call — but only once it is actually answered.
      *
-     * Deliberately the SAME hold as the composer takes: a hold is one prepaid
-     * 24h window per (client, consultant), so chatting and then calling the same
+     * Deliberately the SAME hold as the composer takes: a hold is one prepaid 24h
+     * window per (client, consultant), so chatting and then calling the same
      * consultant inside that window bills once, not twice. The backend is the
-     * authority on that - initiateHold is idempotent per pair per 24h - so
-     * calling it here can only start a window, never double-charge one.
+     * authority on that - initiateHold is idempotent per pair per 24h.
+     *
+     * Unlike a message, a call must NOT bill the moment the button is tapped: an
+     * unanswered / rung-out call should cost nothing. RoomInfo.activeRoomCallParticipants
+     * lists the users currently in the room's RTC session, so we wait (bounded) for the
+     * other party to appear - i.e. they answered - and only then take the hold and
+     * refresh the balance. If nobody joins within the window we never charge.
      *
      * Fire-and-forget on purpose: the call must not be blocked on the wallet
      * round-trip. A consultant calling a client is a no-op (WalletService drops
      * it when the current user is the consultant), and non-DM rooms never bill.
      */
-    private fun chargeForCallIfNeeded() {
+    private fun chargeForCallWhenAnswered() {
         lifecycleScope.launch {
             val roomInfo = room.roomInfoFlow.value
             if (!roomInfo.isDm) return@launch
             val otherUserId = room.membersStateFlow.value
                 .getDirectRoomMember(roomInfo, room.sessionId)
                 ?.userId
-                ?.value
                 ?: return@launch
+            // Suspend until the other party joins the call's RTC session, bounded so a
+            // never-answered call stops observing instead of leaking a collector.
+            val answered = withTimeoutOrNull(CALL_ANSWER_BILLING_WINDOW) {
+                room.roomInfoFlow.first { info ->
+                    info.activeRoomCallParticipants.any { it == otherUserId }
+                }
+                true
+            } ?: false
+            if (!answered) {
+                Timber.d("Call to ${otherUserId.value} was not answered within the billing window; not charging")
+                return@launch
+            }
             walletService.initiateHold(
                 clientId = room.sessionId.value,
-                consultantId = otherUserId,
+                consultantId = otherUserId.value,
             )
+            walletService.refreshBalance(room.sessionId.value)
         }
+    }
+
+    private companion object {
+        /**
+         * How long after tapping call we keep watching for the other party to join
+         * before giving up and treating the call as unanswered (no charge). Generous
+         * enough to cover ringing, tight enough not to leak the observer for long.
+         */
+        private val CALL_ANSWER_BILLING_WINDOW = 2.minutes
     }
 
     @Composable

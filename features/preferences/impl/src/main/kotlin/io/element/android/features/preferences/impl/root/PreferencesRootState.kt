@@ -31,6 +31,8 @@ data class PreferencesRootState(
     val canDeactivateAccount: Boolean,
     val showBlockedUsersItem: Boolean,
     val showLabsItem: Boolean,
+    /** Consultant-only "Billing and Payments" entry (wallet: max credits + bank details). */
+    val showBillingAndPayments: Boolean,
     val directLogoutState: DirectLogoutState,
     val snackbarMessage: SnackbarMessage?,
     val eventSink: (PreferencesRootEvents) -> Unit,

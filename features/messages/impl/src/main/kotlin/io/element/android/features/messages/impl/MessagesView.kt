@@ -139,6 +139,8 @@ fun MessagesView(
     onViewAllPinnedMessagesClick: () -> Unit,
     modifier: Modifier = Modifier,
     forceJumpToBottomVisibility: Boolean = false,
+    // Non-null enables the voice/video chooser on the top-bar call button (start-a-new-call path).
+    onStartCallWithType: ((videoEnabled: Boolean) -> Unit)? = null,
     knockRequestsBannerView: @Composable () -> Unit,
 ) {
     OnLifecycleEvent { _, event ->
@@ -246,6 +248,10 @@ fun MessagesView(
                                 onBackClick = { hidingKeyboard { onBackClick() } },
                                 onRoomDetailsClick = { hidingKeyboard { onRoomDetailsClick() } },
                                 onJoinCallClick = onJoinCallClick,
+                                onStartCallWithType = onStartCallWithType,
+                                // Gate the call button on the same credit rule as the chat composer:
+                                // a client who can't afford the consultant can't start/join a call.
+                                isCallRestricted = state.composerState.isRestricted,
                                 onSummarizeClick = { duration ->
                                     if (duration != null) {
                                         state.eventSink(MessagesEvents.Summarize(duration))
@@ -258,14 +264,15 @@ fun MessagesView(
                                 isRefundRequestInProgress = state.isRefundRequestInProgress,
                                 isConsultantInThisRoom = state.isConsultantInThisRoom,
                                 onRefundClick = { state.eventSink(MessagesEvents.RequestRefund) },
-                                onApproveRefundClick = { state.eventSink(MessagesEvents.ApproveRefund) },
+                                onApproveRefundClick = { state.eventSink(MessagesEvents.ApproveRefund()) },
                                 onRejectRefundClick = { state.eventSink(MessagesEvents.RejectRefund) },
                             )
                             // Banner explaining the in-flight refund request to the consultant.
                             if (state.isConsultantInThisRoom && state.refundStatus == "requested") {
                                 io.element.android.features.messages.impl.topbars.RefundRequestBanner(
                                     isInProgress = state.isRefundRequestInProgress,
-                                    onApprove = { state.eventSink(MessagesEvents.ApproveRefund) },
+                                    heldAmount = state.refundHeldAmount,
+                                    onApprove = { refundAmount -> state.eventSink(MessagesEvents.ApproveRefund(refundAmount)) },
                                     onReject = { state.eventSink(MessagesEvents.RejectRefund) },
                                 )
                             }
@@ -555,6 +562,9 @@ private fun MessagesViewContent(
                 onReadReceiptClick = onReadReceiptClick,
                 forceJumpToBottomVisibility = forceJumpToBottomVisibility,
                 onJoinCallClick = onJoinCallClick,
+                // Gate the in-timeline "Call started" join button on the same credit rule as the
+                // top-bar call button so a credit-restricted client cannot join from either place.
+                isCallRestricted = state.composerState.isRestricted,
                 nestedScrollConnection = scrollBehavior.nestedScrollConnection,
             )
 

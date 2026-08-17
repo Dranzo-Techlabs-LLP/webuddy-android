@@ -24,7 +24,13 @@ sealed interface MessagesEvents {
     data class AskAI(val question: String) : MessagesEvents
     data object DismissSummary : MessagesEvents
     data object RequestRefund : MessagesEvents
-    data object ApproveRefund : MessagesEvents
+
+    /**
+     * Consultant approves the client's refund. [refundAmount] null => full refund (whole held
+     * amount back to the client). A positive value is a PARTIAL refund: only that much returns
+     * to the client and the consultant keeps the remainder (credited immediately server-side).
+     */
+    data class ApproveRefund(val refundAmount: Double? = null) : MessagesEvents
     data object RejectRefund : MessagesEvents
 }
 
