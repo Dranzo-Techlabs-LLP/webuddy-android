@@ -129,6 +129,22 @@
                 <data android:path="/element/" />
             </intent-filter>
             <!--
+              Clariva per-user QR deep links: https://clarivahub.com/u/<matrix user id>
+              autoVerify makes this an Android App Link so a scanned link opens Clariva directly
+              (no browser/disambiguation) once https://clarivahub.com/.well-known/assetlinks.json
+              lists this app + signing cert. Resolved by IntentResolver -> the user's profile.
+            -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="https" />
+                <data android:host="clarivahub.com" />
+                <data android:pathPrefix="/u/" />
+            </intent-filter>
+            <!--
               matrix.to links
               Note: On Android 12 and higher clicking a web link (that is not an Android App Link) always shows content in a web browser
               https://developer.android.com/training/app-links#web-links

@@ -7,6 +7,7 @@
 
 package io.element.android.features.preferences.impl.myqrcode
 
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -14,25 +15,30 @@ import androidx.compose.runtime.remember
 import dev.zacsweers.metro.Inject
 import io.element.android.libraries.architecture.Presenter
 import io.element.android.libraries.matrix.api.MatrixClient
-import io.element.android.libraries.matrix.api.core.UserId
-import io.element.android.libraries.matrix.api.permalink.PermalinkBuilder
 
 @Inject
 class MyQrCodePresenter(
     private val matrixClient: MatrixClient,
-    private val permalinkBuilder: PermalinkBuilder,
 ) : Presenter<MyQrCodeState> {
 
     @Composable
     override fun present(): MyQrCodeState {
         val matrixUser by matrixClient.userProfile.collectAsState()
-        val permalink = remember {
-            val me = UserId(matrixClient.sessionId.value)
-            permalinkBuilder.permalinkForUser(me).getOrNull()
+        val qrData = remember {
+            // Clariva-branded deep link — NOT a matrix.to permalink, which routes external scanners
+            // (phone camera / Google Lens) to matrix.to -> Element X on the Play Store. The Clariva
+            // link is resolved in-app by the QR scanner and IntentResolver (-> the scanned user's
+            // profile). Once clarivahub.com serves /.well-known/assetlinks.json and a /u/ fallback
+            // page, an external scan opens Clariva if installed, else the Clariva Play Store page.
+            CLARIVA_USER_LINK_PREFIX + Uri.encode(matrixClient.sessionId.value)
         }
         return MyQrCodeState(
             matrixUser = matrixUser,
-            permalink = permalink,
+            permalink = qrData,
         )
+    }
+
+    companion object {
+        const val CLARIVA_USER_LINK_PREFIX = "https://clarivahub.com/u/"
     }
 }

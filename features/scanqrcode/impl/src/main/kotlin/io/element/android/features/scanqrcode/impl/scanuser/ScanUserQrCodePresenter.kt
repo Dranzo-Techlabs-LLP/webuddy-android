@@ -8,6 +8,7 @@
 package io.element.android.features.scanqrcode.impl.scanuser
 
 import android.Manifest
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -50,7 +51,12 @@ class ScanUserQrCodePresenter(
                 is ScanUserQrCodeEvents.QrCodeScanned -> {
                     isScanning = false
                     val text = String(event.code, Charsets.UTF_8)
-                    when (val data = permalinkParser.parse(text)) {
+                    // Clariva QR codes encode a clarivahub.com/u/<user id> link. Parse that first;
+                    // fall back to the Matrix permalink parser so a matrix.to user QR still works.
+                    val clarivaUserId = parseClarivaUserLink(text)
+                    if (clarivaUserId != null) {
+                        scannedUserId = clarivaUserId
+                    } else when (val data = permalinkParser.parse(text)) {
                         is PermalinkData.UserLink -> scannedUserId = data.userId
                         else -> isInvalidQrCode = true
                     }
@@ -76,4 +82,17 @@ class ScanUserQrCodePresenter(
             eventSink = ::handleEvent,
         )
     }
+}
+
+/**
+ * Parse a Clariva user deep link (https://clarivahub.com/u/<matrix user id>) to its [UserId], or
+ * null if [text] isn't one. Uri.pathSegments returns already-decoded segments, so an encoded id
+ * like %40user%3Aclarivahub.com round-trips back to @user:clarivahub.com.
+ */
+private fun parseClarivaUserLink(text: String): UserId? {
+    val uri = runCatching { Uri.parse(text.trim()) }.getOrNull() ?: return null
+    if (!uri.host.equals("clarivahub.com", ignoreCase = true)) return null
+    val segments = uri.pathSegments
+    if (segments.size < 2 || segments[0] != "u") return null
+    return segments[1].takeIf { it.startsWith("@") && it.contains(":") }?.let { UserId(it) }
 }

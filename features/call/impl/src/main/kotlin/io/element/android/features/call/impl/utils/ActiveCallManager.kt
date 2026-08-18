@@ -138,6 +138,11 @@ class DefaultActiveCallManager(
                 Timber.tag(tag).w("Already have an active call, ignoring incoming call: $notificationData")
                 return
             }
+            // NOTE: keep this ringing CallType at the default (camera on) so it stays EQUAL to the
+            // callType that DeclineCallBroadcastReceiver / onCancel build for hungUpCall (CallType
+            // is a data class; equality includes startWithVideoMuted). Camera-off for the receiver
+            // is applied on the ANSWER paths instead (IncomingCallActivity.onAnswer and the
+            // notification answerIntent), which is what actually starts the call.
             activeCall.value = ActiveCall(
                 callType = CallType.RoomCall(
                     sessionId = notificationData.sessionId,

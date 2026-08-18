@@ -9,11 +9,13 @@
 package io.element.android.appnav.intent
 
 import android.content.Intent
+import android.net.Uri
 import dev.zacsweers.metro.Inject
 import io.element.android.features.login.api.LoginIntentResolver
 import io.element.android.features.login.api.LoginParams
 import io.element.android.libraries.deeplink.api.DeeplinkData
 import io.element.android.libraries.deeplink.api.DeeplinkParser
+import io.element.android.libraries.matrix.api.core.UserId
 import io.element.android.libraries.matrix.api.permalink.PermalinkData
 import io.element.android.libraries.matrix.api.permalink.PermalinkParser
 import io.element.android.libraries.oidc.api.OidcAction
@@ -55,6 +57,12 @@ class IntentResolver(
             ?.let { loginIntentResolver.parse(it) }
         if (mobileLoginData != null) return ResolvedIntent.Login(mobileLoginData)
 
+        // Clariva user deep link clicked/opened? (https://clarivahub.com/u/<matrix user id>) —
+        // emitted by the per-user QR code so external scanners open Clariva, not matrix.to/Element X.
+        // Reuse the existing UserLink routing (RootFlowNode -> attachUser -> the user's profile).
+        val clarivaUserId = actionViewData?.let { parseClarivaUserLink(it) }
+        if (clarivaUserId != null) return ResolvedIntent.Permalink(PermalinkData.UserLink(clarivaUserId))
+
         // External link clicked? (matrix.to, element.io, etc.)
         val permalinkData = actionViewData
             ?.let { permalinkParser.parse(it) }
@@ -74,4 +82,17 @@ class IntentResolver(
 private fun Intent.canBeIgnored(): Boolean {
     return action == Intent.ACTION_MAIN &&
         categories?.contains(Intent.CATEGORY_LAUNCHER) == true
+}
+
+/**
+ * Parse a Clariva user deep link (https://clarivahub.com/u/<matrix user id>) to its [UserId], or
+ * null if [url] isn't one. Uri.pathSegments returns already-decoded segments, so an encoded id like
+ * %40user%3Aclarivahub.com round-trips back to @user:clarivahub.com.
+ */
+private fun parseClarivaUserLink(url: String): UserId? {
+    val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return null
+    if (!uri.host.equals("clarivahub.com", ignoreCase = true)) return null
+    val segments = uri.pathSegments
+    if (segments.size < 2 || segments[0] != "u") return null
+    return segments[1].takeIf { it.startsWith("@") && it.contains(":") }?.let { UserId(it) }
 }

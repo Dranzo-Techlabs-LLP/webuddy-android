@@ -88,7 +88,12 @@ class RingingCallNotificationCreator(
             .setImportant(true)
             .build()
 
-        val answerIntent = IntentProvider.getPendingIntent(context, CallType.RoomCall(sessionId, roomId))
+        // Answer with the camera OFF (voice-first) — this is the notification's Answer action and
+        // content tap, so it must match onAnswer's camera-off behavior.
+        val answerIntent = IntentProvider.getPendingIntent(
+            context,
+            CallType.RoomCall(sessionId = sessionId, roomId = roomId, startWithVideoMuted = true),
+        )
         val notificationData = CallNotificationData(
             sessionId = sessionId,
             roomId = roomId,
@@ -127,7 +132,11 @@ class RingingCallNotificationCreator(
             .setSmallIcon(CommonDrawables.ic_notification)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_CALL)
-            .setStyle(NotificationCompat.CallStyle.forIncomingCall(caller, declineIntent, answerIntent).setIsVideo(true))
+            // Clariva calls are voice-first (the caller starts with the camera off) and there is no
+            // per-call voice/video flag in the ring data, so present the incoming call as an audio
+            // call rather than hardcoding video — the ring UI then shows "voice call", and the
+            // receiver joins with the camera off (see ActiveCallManager.registerIncomingCall).
+            .setStyle(NotificationCompat.CallStyle.forIncomingCall(caller, declineIntent, answerIntent).setIsVideo(false))
             .addPerson(caller)
             .setAutoCancel(true)
             .setWhen(timestamp)
