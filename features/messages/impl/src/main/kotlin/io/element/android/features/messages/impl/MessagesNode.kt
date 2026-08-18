@@ -64,6 +64,7 @@ import io.element.android.libraries.matrix.api.permalink.PermalinkData
 import io.element.android.libraries.matrix.api.permalink.PermalinkParser
 import io.element.android.libraries.matrix.api.room.JoinedRoom
 import io.element.android.libraries.matrix.api.room.alias.matches
+import io.element.android.libraries.matrix.api.room.isDm
 import io.element.android.libraries.matrix.api.timeline.Timeline
 import io.element.android.libraries.matrix.api.timeline.item.TimelineItemDebugInfo
 import io.element.android.libraries.mediaplayer.api.MediaPlayer
@@ -280,10 +281,16 @@ class MessagesNode(
                 onSendLocationClick = callback::navigateToSendLocation,
                 onCreatePollClick = callback::navigateToCreatePoll,
                 onJoinCallClick = { callback.navigateToRoomCall(room.roomId) },
-                onStartCallWithType = { videoEnabled ->
-                    // Voice = camera off; Video = camera on. Element Call has no audio-only mode,
-                    // so a voice call is a call started with the camera muted.
-                    callback.navigateToRoomCall(room.roomId, startWithVideoMuted = !videoEnabled)
+                // The voice/video chooser only makes sense for DMs: Element Call's camera-off start
+                // is a DM-only "voice" intent, so a group "Voice call" couldn't honor camera-off.
+                // Group rooms therefore keep the direct video-call button (onStartCallWithType null).
+                onStartCallWithType = if (room.info().isDm) {
+                    { videoEnabled ->
+                        // Voice = camera off; Video = camera on.
+                        callback.navigateToRoomCall(room.roomId, startWithVideoMuted = !videoEnabled)
+                    }
+                } else {
+                    null
                 },
                 onViewAllPinnedMessagesClick = callback::navigateToPinnedMessagesList,
                 modifier = modifier,

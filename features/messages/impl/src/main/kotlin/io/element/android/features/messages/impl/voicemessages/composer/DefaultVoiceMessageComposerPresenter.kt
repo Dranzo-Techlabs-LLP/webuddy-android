@@ -31,8 +31,12 @@ import io.element.android.features.messages.api.timeline.voicemessages.composer.
 import io.element.android.features.messages.api.timeline.voicemessages.composer.VoiceMessageComposerState
 import io.element.android.libraries.di.RoomScope
 import io.element.android.libraries.di.annotations.SessionCoroutineScope
+import io.element.android.libraries.matrix.api.room.JoinedRoom
+import io.element.android.libraries.matrix.api.room.getDirectRoomMember
+import io.element.android.libraries.matrix.api.room.isDm
 import io.element.android.libraries.matrix.api.timeline.Timeline
 import io.element.android.libraries.mediaupload.api.MediaSenderFactory
+import io.element.android.libraries.network.wallet.WalletService
 import io.element.android.libraries.permissions.api.PermissionsEvent
 import io.element.android.libraries.permissions.api.PermissionsPresenter
 import io.element.android.libraries.textcomposer.model.VoiceMessagePlayerEvent
@@ -60,7 +64,9 @@ class DefaultVoiceMessageComposerPresenter(
     mediaSenderFactory: MediaSenderFactory,
     private val player: VoiceMessageComposerPlayer,
     private val messageComposerContext: MessageComposerContext,
-    permissionsPresenterFactory: PermissionsPresenter.Factory
+    permissionsPresenterFactory: PermissionsPresenter.Factory,
+    private val room: JoinedRoom,
+    private val walletService: WalletService,
 ) : VoiceMessageComposerPresenter {
     @ContributesBinding(RoomScope::class)
     @AssistedFactory
@@ -271,7 +277,34 @@ class DefaultVoiceMessageComposerPresenter(
 
         voiceRecorder.deleteRecording()
 
+        // Clariva: a voice message bills on the same terms as a text message or a
+        // call — one prepaid 24h hold per (client, consultant). initiateHold is
+        // idempotent per pair per 24h on the backend, so chatting/voice/calling the
+        // same consultant inside that window bills once, not per action. Awaited so
+        // the balance refresh below reflects the debit.
+        chargeForVoiceMessageIfNeeded()
+
         return result
+    }
+
+    /**
+     * Take the same wallet hold a text message takes, then refresh the balance so the
+     * deduction shows immediately. A no-op in non-DM rooms, and WalletService drops it
+     * when the current user is the consultant (only clients pay).
+     */
+    private suspend fun chargeForVoiceMessageIfNeeded() {
+        val roomInfo = room.roomInfoFlow.value
+        if (!roomInfo.isDm) return
+        val otherUserId = room.membersStateFlow.value
+            .getDirectRoomMember(roomInfo, room.sessionId)
+            ?.userId
+            ?.value
+            ?: return
+        walletService.initiateHold(
+            clientId = room.sessionId.value,
+            consultantId = otherUserId,
+        )
+        walletService.refreshBalance(room.sessionId.value)
     }
 
     private fun AnalyticsService.captureComposerEvent() =

@@ -66,6 +66,7 @@ fun PreferencesRootView(
     onOpenNotificationSettings: () -> Unit,
     onOpenUserProfile: (MatrixUser) -> Unit,
     onOpenBlockedUsers: () -> Unit,
+    onMyQrCodeClick: () -> Unit,
     onSignOutClick: () -> Unit,
     onDeactivateClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -104,6 +105,7 @@ fun PreferencesRootView(
             state = state,
             onManageAccountClick = onManageAccountClick,
             onLinkNewDeviceClick = onLinkNewDeviceClick,
+            onMyQrCodeClick = onMyQrCodeClick,
             onOpenBlockedUsers = onOpenBlockedUsers
         )
 
@@ -198,8 +200,14 @@ private fun ColumnScope.ManageAccountSection(
     state: PreferencesRootState,
     onManageAccountClick: (url: String) -> Unit,
     onLinkNewDeviceClick: () -> Unit,
+    onMyQrCodeClick: () -> Unit,
     onOpenBlockedUsers: () -> Unit,
 ) {
+    ListItem(
+        headlineContent = { Text("My QR code") },
+        leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.QrCode())),
+        onClick = onMyQrCodeClick,
+    )
     if (state.showLinkNewDevice) {
         ListItem(
             headlineContent = { Text(stringResource(id = CommonStrings.common_link_new_device)) },
@@ -381,6 +389,7 @@ private fun ContentToPreview(matrixUser: MatrixUser) {
         onOpenLockScreenSettings = {},
         onOpenUserProfile = {},
         onOpenBlockedUsers = {},
+        onMyQrCodeClick = {},
         onSignOutClick = {},
         onDeactivateClick = {},
     )

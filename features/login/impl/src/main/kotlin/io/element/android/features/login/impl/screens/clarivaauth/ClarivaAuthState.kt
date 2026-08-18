@@ -39,6 +39,45 @@ enum class UsernameAvailability {
     Taken,
 }
 
+/** Live result of the server-side email lookup on the sign-up form. */
+enum class EmailAvailability {
+    /** Nothing typed yet, or the email is not well-formed enough to check. */
+    Unknown,
+    Checking,
+    Available,
+    Taken,
+}
+
+/** The two steps of the forgot-password dialog: request a code, then set a new password. */
+enum class ForgotPasswordStep {
+    EnterEmail,
+    EnterCode,
+}
+
+/**
+ * State of the forgot-password dialog. Null on [ClarivaAuthState] means the
+ * dialog is closed.
+ */
+data class ForgotPasswordState(
+    val email: String,
+    val code: String,
+    val newPassword: String,
+    val step: ForgotPasswordStep,
+    val isLoading: Boolean,
+    val error: String?,
+    /** True once the reset succeeded; the dialog shows a success note and closes. */
+    val done: Boolean = false,
+) {
+    val emailValid: Boolean get() = email.contains('@') && email.trim().length >= 5
+    val codeValid: Boolean get() = code.trim().length == 6 && code.trim().all { it.isDigit() }
+    val newPasswordValid: Boolean get() = newPassword.length >= ClarivaAuthState.MIN_PASSWORD_LENGTH
+
+    /** Step 1 "Send code" is enabled once a plausible email is entered. */
+    val sendEnabled: Boolean get() = !isLoading && emailValid
+    /** Step 2 "Reset password" is enabled once code + new password are valid. */
+    val resetEnabled: Boolean get() = !isLoading && codeValid && newPasswordValid
+}
+
 data class ClarivaAuthState(
     val mode: ClarivaAuthMode,
     val email: String,
@@ -47,6 +86,8 @@ data class ClarivaAuthState(
     /** Unique handle chosen at sign-up; becomes @username:clarivahub.com. */
     val username: String,
     val usernameAvailability: UsernameAvailability,
+    /** Live "already registered" result for the email on the sign-up form. */
+    val emailAvailability: EmailAvailability,
     val isConsultant: Boolean,
     /** Shown in the welcome message, e.g. "the fastest Clariva ever". */
     val productionApplicationName: String,
@@ -65,6 +106,8 @@ data class ClarivaAuthState(
      * account does not exist yet at this point - choosing is what creates it.
      */
     val googleRolePrompt: GoogleRolePrompt?,
+    /** Non-null while the forgot-password dialog is open. */
+    val forgotPassword: ForgotPasswordState?,
     val authAction: AsyncData<Unit>,
     val eventSink: (ClarivaAuthEvents) -> Unit,
 ) {
@@ -111,12 +154,14 @@ data class ClarivaAuthState(
         get() = !isLoading && credentialsValid && when (mode) {
             ClarivaAuthMode.SignIn -> true
             // Sign-up additionally requires a name and a well-formed handle that
-            // is not already known to be taken. An unfinished/failed availability
-            // check does NOT block submit - the server is the real gate.
+            // is not already known to be taken, plus an email not already known to
+            // be registered. An unfinished/failed availability check does NOT block
+            // submit - the server is the real gate.
             ClarivaAuthMode.SignUp ->
                 name.trim().length >= MIN_NAME_LENGTH &&
                     isUsernameWellFormed &&
-                    usernameAvailability != UsernameAvailability.Taken
+                    usernameAvailability != UsernameAvailability.Taken &&
+                    emailAvailability != EmailAvailability.Taken
         }
 
     companion object {

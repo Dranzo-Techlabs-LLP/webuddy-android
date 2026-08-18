@@ -23,6 +23,7 @@ interface StartChatNavigator : Plugin {
     fun onShowJoinRoomByAddress()
     fun onDismissJoinRoomByAddress()
     fun onOpenRoomDirectory()
+    fun onScanQrCode()
 }
 
 class DefaultStartChatNavigator(
@@ -30,11 +31,14 @@ class DefaultStartChatNavigator(
     private val overlay: Overlay<NavTarget>,
     private val openRoom: (RoomIdOrAlias, List<String>) -> Unit,
     private val openRoomDirectory: () -> Unit,
+    private val openScanQrCode: () -> Unit,
 ) : StartChatNavigator {
     override fun onRoomCreated(roomIdOrAlias: RoomIdOrAlias, serverNames: List<String>) =
         openRoom(roomIdOrAlias, serverNames)
 
     override fun onOpenRoomDirectory() = openRoomDirectory()
+
+    override fun onScanQrCode() = openScanQrCode()
 
     override fun onCreateNewRoom() {
         backstack.push(NavTarget.NewRoom)

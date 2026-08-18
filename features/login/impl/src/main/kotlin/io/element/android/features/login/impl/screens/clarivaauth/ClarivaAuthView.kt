@@ -251,6 +251,13 @@ fun ClarivaAuthView(
             )
         }
 
+        state.forgotPassword?.let { fp ->
+            ClarivaForgotPasswordDialog(
+                state = fp,
+                eventSink = state.eventSink,
+            )
+        }
+
         val failure = state.authAction
         if (failure is AsyncData.Failure) {
             ErrorDialog(
@@ -343,6 +350,26 @@ private fun ClarivaAuthForm(
             placeholder = stringResource(
                 if (isSignUp) R.string.clariva_auth_email_placeholder else R.string.clariva_auth_identifier_placeholder
             ),
+            // Live "already registered" feedback on sign-up, mirroring the username field.
+            supportingText = if (isSignUp) {
+                when (state.emailAvailability) {
+                    EmailAvailability.Checking -> stringResource(R.string.clariva_auth_email_checking)
+                    EmailAvailability.Available -> stringResource(R.string.clariva_auth_email_available)
+                    EmailAvailability.Taken -> stringResource(R.string.clariva_auth_email_taken)
+                    EmailAvailability.Unknown -> null
+                }
+            } else {
+                null
+            },
+            validity = if (isSignUp) {
+                when (state.emailAvailability) {
+                    EmailAvailability.Taken -> TextFieldValidity.Invalid
+                    EmailAvailability.Available -> TextFieldValidity.Valid
+                    else -> TextFieldValidity.None
+                }
+            } else {
+                TextFieldValidity.None
+            },
             keyboardOptions = KeyboardOptions(
                 // Plain text on sign-in: the email keyboard hides letters behind
                 // an '@'-first layout, which is wrong for a username.
@@ -391,6 +418,22 @@ private fun ClarivaAuthForm(
             keyboardActions = KeyboardActions(onDone = { onSubmit() }),
             singleLine = true,
         )
+
+        if (!isSignUp) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.clariva_auth_forgot_password),
+                style = ElementTheme.typography.fontBodyMdMedium,
+                color = ElementTheme.colors.textPrimary,
+                modifier = Modifier
+                    .align(Alignment.End)
+                    .clickable(enabled = !state.isLoading) {
+                        eventSink(ClarivaAuthEvents.ForgotPasswordOpen)
+                    }
+                    .padding(4.dp)
+                    .testTag("clariva-auth-forgot-password"),
+            )
+        }
 
         if (isSignUp) {
             Spacer(Modifier.height(20.dp))

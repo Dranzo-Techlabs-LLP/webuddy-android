@@ -23,6 +23,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
@@ -57,6 +58,7 @@ fun StartChatView(
     onInviteFriendsClick: () -> Unit,
     onJoinByAddressClick: () -> Unit,
     onRoomDirectorySearchClick: () -> Unit,
+    onScanQrCodeClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -93,6 +95,7 @@ fun StartChatView(
                     onInvitePeopleClick = onInviteFriendsClick,
                     onJoinByAddressClick = onJoinByAddressClick,
                     onRoomDirectorySearchClick = onRoomDirectorySearchClick,
+                    onScanQrCodeClick = onScanQrCodeClick,
                     onDmClick = onOpenDM,
                 )
             }
@@ -154,6 +157,7 @@ private fun CreateRoomActionButtonsList(
     onInvitePeopleClick: () -> Unit,
     onJoinByAddressClick: () -> Unit,
     onRoomDirectorySearchClick: () -> Unit,
+    onScanQrCodeClick: () -> Unit,
     onDmClick: (RoomId) -> Unit,
 ) {
     LazyColumn {
@@ -162,6 +166,13 @@ private fun CreateRoomActionButtonsList(
                 iconRes = CompoundDrawables.ic_compound_plus,
                 text = stringResource(id = R.string.screen_create_room_action_create_room),
                 onClick = onNewRoomClick,
+            )
+        }
+        item {
+            CreateRoomActionButton(
+                imageVector = CompoundIcons.QrCode(),
+                text = "Scan QR code",
+                onClick = onScanQrCodeClick,
             )
         }
         if (state.isRoomDirectorySearchEnabled) {
@@ -238,6 +249,34 @@ private fun CreateRoomActionButton(
     }
 }
 
+@Composable
+private fun CreateRoomActionButton(
+    imageVector: ImageVector,
+    text: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            modifier = Modifier.size(24.dp),
+            tint = ElementTheme.colors.iconSecondary,
+            imageVector = imageVector,
+            contentDescription = null,
+        )
+        Text(
+            text = text,
+            style = ElementTheme.typography.fontBodyLgRegular,
+        )
+    }
+}
+
 @PreviewsDayNight
 @Composable
 internal fun StartChatViewPreview(@PreviewParameter(StartChatStateProvider::class) state: StartChatState) =
@@ -250,5 +289,6 @@ internal fun StartChatViewPreview(@PreviewParameter(StartChatStateProvider::clas
             onJoinByAddressClick = {},
             onInviteFriendsClick = {},
             onRoomDirectorySearchClick = {},
+            onScanQrCodeClick = {},
         )
     }

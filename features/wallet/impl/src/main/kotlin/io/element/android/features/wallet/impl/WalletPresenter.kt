@@ -85,6 +85,8 @@ class WalletPresenter @Inject constructor(
         }
 
         LaunchedEffect(Unit) {
+            // Opening the wallet should show a fresh balance, not the last cached value.
+            walletService.refreshBalance(matrixClient.sessionId.value)
             fetchTransactions(1, isRefresh = true)
         }
 

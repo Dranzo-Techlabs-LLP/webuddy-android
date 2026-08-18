@@ -29,4 +29,17 @@ sealed interface ClarivaAuthEvents {
     data class GoogleSignInFailed(val message: String) : ClarivaAuthEvents
 
     data object ClearError : ClarivaAuthEvents
+
+    // --- Forgot / reset password (6-digit code by email) ---
+    /** Open the forgot-password dialog (from the sign-in screen). */
+    data object ForgotPasswordOpen : ClarivaAuthEvents
+    /** Close/cancel the forgot-password dialog. */
+    data object ForgotPasswordDismiss : ClarivaAuthEvents
+    data class ForgotPasswordSetEmail(val email: String) : ClarivaAuthEvents
+    data class ForgotPasswordSetCode(val code: String) : ClarivaAuthEvents
+    data class ForgotPasswordSetNewPassword(val password: String) : ClarivaAuthEvents
+    /** Step 1: request the emailed code. */
+    data object ForgotPasswordRequestCode : ClarivaAuthEvents
+    /** Step 2: submit the code + new password. */
+    data object ForgotPasswordSubmit : ClarivaAuthEvents
 }

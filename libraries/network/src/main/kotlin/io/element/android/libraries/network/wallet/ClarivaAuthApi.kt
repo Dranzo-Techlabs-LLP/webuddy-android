@@ -35,6 +35,21 @@ interface ClarivaAuthApi {
     @GET("v1/auth/username-available")
     suspend fun usernameAvailable(@Query("username") username: String): ClarivaUsernameAvailability
 
+    /** Live email availability check on the sign-up form. */
+    @GET("v1/auth/email-available")
+    suspend fun emailAvailable(@Query("email") email: String): ClarivaEmailAvailability
+
+    /**
+     * Start a password reset: the server emails a 6-digit code. Always returns
+     * `{ ok: true }` regardless of whether the email exists (non-enumerating).
+     */
+    @POST("v1/auth/forgot-password")
+    suspend fun forgotPassword(@Body request: ClarivaForgotPasswordRequest): ClarivaOkResponse
+
+    /** Complete a password reset with the emailed code + a new password. */
+    @POST("v1/auth/reset-password")
+    suspend fun resetPassword(@Body request: ClarivaResetPasswordRequest): ClarivaOkResponse
+
     /**
      * Returns `needsRole = true` (and creates nothing) when a brand-new Google
      * user has not chosen a role yet; the client asks and re-posts.
@@ -151,6 +166,29 @@ data class ClarivaUser(
 data class ClarivaUsernameAvailability(
     @SerialName("available") val available: Boolean,
     @SerialName("reason") val reason: String? = null,
+)
+
+@Serializable
+data class ClarivaEmailAvailability(
+    @SerialName("available") val available: Boolean,
+    @SerialName("reason") val reason: String? = null,
+)
+
+@Serializable
+data class ClarivaForgotPasswordRequest(
+    @SerialName("email") val email: String,
+)
+
+@Serializable
+data class ClarivaResetPasswordRequest(
+    @SerialName("email") val email: String,
+    @SerialName("code") val code: String,
+    @SerialName("newPassword") val newPassword: String,
+)
+
+@Serializable
+data class ClarivaOkResponse(
+    @SerialName("ok") val ok: Boolean = false,
 )
 
 @Serializable

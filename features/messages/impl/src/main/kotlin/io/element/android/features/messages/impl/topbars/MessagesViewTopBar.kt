@@ -156,7 +156,7 @@ internal fun MessagesViewTopBar(
                         tint = iconTint,
                     )
                     Text(
-                        text = "Refund",
+                        text = "Request refund",
                         style = ElementTheme.typography.fontBodyMdMedium,
                         color = labelTint,
                     )

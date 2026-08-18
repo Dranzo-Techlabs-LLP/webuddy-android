@@ -33,6 +33,7 @@ import io.element.android.features.preferences.impl.billing.BillingAndPaymentsNo
 import io.element.android.features.preferences.impl.blockedusers.BlockedUsersNode
 import io.element.android.features.preferences.impl.developer.DeveloperSettingsNode
 import io.element.android.features.preferences.impl.labs.LabsNode
+import io.element.android.features.preferences.impl.myqrcode.MyQrCodeNode
 import io.element.android.features.preferences.impl.notifications.NotificationSettingsNode
 import io.element.android.features.preferences.impl.notifications.edit.EditDefaultNotificationSettingNode
 import io.element.android.features.preferences.impl.root.PreferencesRootNode
@@ -123,6 +124,9 @@ class PreferencesFlowNode(
 
         @Parcelize
         data object BillingAndPayments : NavTarget
+
+        @Parcelize
+        data object MyQrCode : NavTarget
     }
 
     private val callback: PreferencesEntryPoint.Callback = callback()
@@ -185,6 +189,10 @@ class PreferencesFlowNode(
 
                     override fun navigateToBlockedUsers() {
                         backstack.push(NavTarget.BlockedUsers)
+                    }
+
+                    override fun navigateToMyQrCode() {
+                        backstack.push(NavTarget.MyQrCode)
                     }
 
                     override fun startSignOutFlow() {
@@ -305,6 +313,14 @@ class PreferencesFlowNode(
                     }
                 }
                 createNode<BankDetailsNode>(buildContext, listOf(callback))
+            }
+            NavTarget.MyQrCode -> {
+                val callback = object : MyQrCodeNode.Callback {
+                    override fun onDone() {
+                        backstack.pop()
+                    }
+                }
+                createNode<MyQrCodeNode>(buildContext, listOf(callback))
             }
             is NavTarget.UserProfile -> {
                 val inputs = EditUserProfileNode.Inputs(navTarget.matrixUser)

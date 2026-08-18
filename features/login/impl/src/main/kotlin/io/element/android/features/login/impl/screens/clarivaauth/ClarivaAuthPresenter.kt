@@ -32,6 +32,8 @@ import io.element.android.libraries.matrix.api.encryption.RecoveryState
 import io.element.android.libraries.network.wallet.ClarivaAuthService
 import io.element.android.libraries.sessionstorage.api.SessionStore
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -59,9 +61,26 @@ class ClarivaAuthPresenter(
     @AppCoroutineScope
     private val appCoroutineScope: CoroutineScope,
 ) : Presenter<ClarivaAuthState> {
+    // Homeserver discovery (a .well-known network round-trip) is independent of the user's
+    // credentials, so we pre-warm it as soon as the auth screen opens. By the time the user
+    // finishes typing and submits, it's already done — removing it from the post-submit critical
+    // path (which otherwise ran setHomeserver serially before importCreatedSession).
+    private var homeserverJob: Deferred<Result<Unit>>? = null
+
     @Composable
     override fun present(): ClarivaAuthState {
         val coroutineScope = rememberCoroutineScope()
+
+        // Kick off homeserver discovery once, eagerly, on the app scope so it survives navigation.
+        LaunchedEffect(Unit) {
+            if (homeserverJob == null) {
+                homeserverJob = appCoroutineScope.async {
+                    // .map { } discards the MatrixHomeServerDetails payload — we only care whether
+                    // the homeserver was set (Result<Unit>), matching ensureHomeserverSet's usage.
+                    authenticationService.setHomeserver(OnBoardingConfig.DEFAULT_HOMESERVER_URL).map { }
+                }
+            }
+        }
 
         // This screen is the app's landing page, so returning users are the
         // common case - default to signing in rather than signing up.
@@ -73,6 +92,7 @@ class ClarivaAuthPresenter(
         var isConsultant by rememberSaveable { mutableStateOf(false) }
         var authAction by remember { mutableStateOf<AsyncData<Unit>>(AsyncData.Uninitialized) }
         var googleRolePrompt by remember { mutableStateOf<GoogleRolePrompt?>(null) }
+        var forgotPassword by remember { mutableStateOf<ForgotPasswordState?>(null) }
 
         val isAddingAccount by produceState(initialValue = false) {
             value = sessionStore.numberOfSessions() > 0
@@ -99,6 +119,27 @@ class ClarivaAuthPresenter(
                 result == null -> UsernameAvailability.Unknown
                 result.available -> UsernameAvailability.Available
                 else -> UsernameAvailability.Taken
+            }
+        }
+
+        // Live email availability, mirroring the username check: only on sign-up,
+        // debounced, and silent on a network failure (the server is the real gate).
+        val normalizedEmail = email.trim()
+        val isEmailWellFormed = normalizedEmail.contains('@') && normalizedEmail.length >= 5
+        var emailAvailability by remember { mutableStateOf(EmailAvailability.Unknown) }
+
+        LaunchedEffect(normalizedEmail, isEmailWellFormed, mode) {
+            if (mode != ClarivaAuthMode.SignUp || !isEmailWellFormed) {
+                emailAvailability = EmailAvailability.Unknown
+                return@LaunchedEffect
+            }
+            emailAvailability = EmailAvailability.Checking
+            delay(USERNAME_CHECK_DEBOUNCE_MS)
+            val result = clarivaAuthService.isEmailAvailable(normalizedEmail)
+            emailAvailability = when {
+                result == null -> EmailAvailability.Unknown
+                result.available -> EmailAvailability.Available
+                else -> EmailAvailability.Taken
             }
         }
 
@@ -192,6 +233,85 @@ class ClarivaAuthPresenter(
                 is ClarivaAuthEvents.GoogleSignInFailed -> {
                     authAction = AsyncData.Failure(Exception(event.message))
                 }
+
+                ClarivaAuthEvents.ForgotPasswordOpen -> {
+                    forgotPassword = ForgotPasswordState(
+                        // Prefill with whatever email-looking value they already typed.
+                        email = email.trim().takeIf { it.contains('@') }.orEmpty(),
+                        code = "",
+                        newPassword = "",
+                        step = ForgotPasswordStep.EnterEmail,
+                        isLoading = false,
+                        error = null,
+                    )
+                }
+                ClarivaAuthEvents.ForgotPasswordDismiss -> {
+                    val fp = forgotPassword
+                    // After a successful reset, drop back to sign-in with the email
+                    // prefilled so the user only has to type the new password.
+                    if (fp != null && fp.done) {
+                        mode = ClarivaAuthMode.SignIn
+                        email = fp.email
+                        password = ""
+                        authAction = AsyncData.Uninitialized
+                    }
+                    forgotPassword = null
+                }
+                is ClarivaAuthEvents.ForgotPasswordSetEmail -> {
+                    forgotPassword = forgotPassword?.copy(email = event.email.trim(), error = null)
+                }
+                is ClarivaAuthEvents.ForgotPasswordSetCode -> {
+                    // Digits only, max 6.
+                    forgotPassword = forgotPassword?.copy(
+                        code = event.code.filter { it.isDigit() }.take(6),
+                        error = null,
+                    )
+                }
+                is ClarivaAuthEvents.ForgotPasswordSetNewPassword -> {
+                    forgotPassword = forgotPassword?.copy(newPassword = event.password, error = null)
+                }
+                ClarivaAuthEvents.ForgotPasswordRequestCode -> {
+                    val current = forgotPassword ?: return@handleEvent
+                    if (!current.sendEnabled) return@handleEvent
+                    forgotPassword = current.copy(isLoading = true, error = null)
+                    coroutineScope.launch {
+                        val result = clarivaAuthService.requestPasswordReset(current.email)
+                        // Drop the result if the dialog was dismissed meanwhile.
+                        val latest = forgotPassword ?: return@launch
+                        forgotPassword = result.fold(
+                            // Always advance to code entry — the server does not reveal
+                            // whether the email exists, so neither do we. Clear any
+                            // previously-typed code: a (re)send invalidates prior codes
+                            // server-side, so a stale value would only ever fail.
+                            onSuccess = {
+                                latest.copy(
+                                    isLoading = false,
+                                    step = ForgotPasswordStep.EnterCode,
+                                    code = "",
+                                    error = null,
+                                )
+                            },
+                            onFailure = { latest.copy(isLoading = false, error = it.message) },
+                        )
+                    }
+                }
+                ClarivaAuthEvents.ForgotPasswordSubmit -> {
+                    val current = forgotPassword ?: return@handleEvent
+                    if (!current.resetEnabled) return@handleEvent
+                    forgotPassword = current.copy(isLoading = true, error = null)
+                    coroutineScope.launch {
+                        val result = clarivaAuthService.resetPassword(
+                            email = current.email,
+                            code = current.code,
+                            newPassword = current.newPassword,
+                        )
+                        val latest = forgotPassword ?: return@launch
+                        forgotPassword = result.fold(
+                            onSuccess = { latest.copy(isLoading = false, done = true, error = null) },
+                            onFailure = { latest.copy(isLoading = false, error = it.message) },
+                        )
+                    }
+                }
             }
         }
 
@@ -202,12 +322,14 @@ class ClarivaAuthPresenter(
             name = name,
             username = username,
             usernameAvailability = usernameAvailability,
+            emailAvailability = emailAvailability,
             isConsultant = isConsultant,
             productionApplicationName = buildMeta.productionApplicationName,
             version = buildMeta.versionName,
             isAddingAccount = isAddingAccount,
             isGoogleSignInConfigured = ClarivaConfig.isGoogleSignInConfigured,
             googleRolePrompt = googleRolePrompt,
+            forgotPassword = forgotPassword,
             authAction = authAction,
             eventSink = ::handleEvent,
         )
@@ -357,9 +479,28 @@ class ClarivaAuthPresenter(
         }
     }
 
+    /**
+     * Await the pre-warmed homeserver discovery started when the screen opened. Falls back to
+     * running it inline if the pre-warm was never started or came back a failure (e.g. a transient
+     * network error), so correctness never depends on the pre-warm having succeeded.
+     */
+    private suspend fun ensureHomeserverSet() {
+        // Consume the pre-warm EXACTLY ONCE. setHomeserver rotates (and deletes) the previous
+        // session path and refreshes the SDK client, so every import ATTEMPT must run it fresh —
+        // the original code called it inline at the start of each attempt for this reason. Reusing
+        // the cached pre-warm for a later retry would reuse a consumed client + un-rotated path and
+        // wedge the retry. So null the job after this first use: the first (common-case) attempt
+        // keeps the discovery speedup; any retry falls through to a fresh inline setHomeserver,
+        // exactly like the old always-inline behavior.
+        val prewarmed = homeserverJob?.let { runCatching { it.await() }.getOrNull() }
+        homeserverJob = null
+        if (prewarmed?.isSuccess == true) return
+        authenticationService.setHomeserver(OnBoardingConfig.DEFAULT_HOMESERVER_URL).getOrThrow()
+    }
+
     private suspend fun importSession(credentials: ClarivaAuthService.Credentials): AsyncData<Unit> {
         return try {
-            authenticationService.setHomeserver(OnBoardingConfig.DEFAULT_HOMESERVER_URL).getOrThrow()
+            ensureHomeserverSet()
 
             val sessionId = authenticationService.importCreatedSession(
                 ExternalSession(

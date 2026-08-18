@@ -30,7 +30,14 @@ class DefaultCallWidgetSettingsProvider(
     private val callAnalyticsCredentialsProvider: CallAnalyticCredentialsProvider,
     private val analyticsService: AnalyticsService,
 ) : CallWidgetSettingsProvider {
-    override suspend fun provide(baseUrl: String, widgetId: String, encrypted: Boolean, direct: Boolean, hasActiveCall: Boolean): MatrixWidgetSettings {
+    override suspend fun provide(
+        baseUrl: String,
+        widgetId: String,
+        encrypted: Boolean,
+        direct: Boolean,
+        hasActiveCall: Boolean,
+        startWithVideoMuted: Boolean,
+    ): MatrixWidgetSettings {
         val isAnalyticsEnabled = analyticsService.userConsentFlow.first()
         val properties = VirtualElementCallWidgetProperties(
             elementCallUrl = baseUrl,
@@ -51,9 +58,15 @@ class DefaultCallWidgetSettingsProvider(
             preload = false,
             // TODO remove this once we have the next EC version
             skipLobby = null,
+            // Element Call derives the initial camera state from the intent: the *_DM_VOICE
+            // intents start with the camera off (defaultVideoEnabled=false), audio on. They only
+            // exist for DM rooms, so a voice call in a non-DM room falls back to the normal intent
+            // (camera-off is then only reachable via the pre-join lobby).
             intent = when {
+                direct && hasActiveCall && startWithVideoMuted -> CallIntent.JOIN_EXISTING_DM_VOICE
                 direct && hasActiveCall -> CallIntent.JOIN_EXISTING_DM
                 hasActiveCall -> CallIntent.JOIN_EXISTING
+                direct && startWithVideoMuted -> CallIntent.START_CALL_DM_VOICE
                 direct -> CallIntent.START_CALL_DM
                 else -> CallIntent.START_CALL
             }.also {

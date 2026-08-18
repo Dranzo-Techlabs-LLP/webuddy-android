@@ -51,7 +51,8 @@ internal fun CallMenuItem(
     // onJoinCallClick. Only wired for the DM chat top bar; other callers keep the direct behaviour.
     onStartCallWithType: ((videoEnabled: Boolean) -> Unit)? = null,
     // Client credit gate: when true the client cannot afford the consultant, so the call button is
-    // disabled — mirroring how the chat composer is restricted. Never true for the consultant.
+    // HIDDEN entirely — mirroring how the chat composer is replaced by the recharge banner. Never
+    // true for the consultant.
     isCallRestricted: Boolean = false,
 ) {
     when (roomCallState) {
@@ -59,21 +60,27 @@ internal fun CallMenuItem(
             Box(modifier)
         }
         is RoomCallState.StandBy -> {
-            StandByCallMenuItem(
-                roomCallState = roomCallState,
-                onJoinCallClick = onJoinCallClick,
-                onStartCallWithType = onStartCallWithType,
-                isCallRestricted = isCallRestricted,
-                modifier = modifier,
-            )
+            if (isCallRestricted) {
+                Box(modifier)
+            } else {
+                StandByCallMenuItem(
+                    roomCallState = roomCallState,
+                    onJoinCallClick = onJoinCallClick,
+                    onStartCallWithType = onStartCallWithType,
+                    modifier = modifier,
+                )
+            }
         }
         is RoomCallState.OnGoing -> {
-            OnGoingCallMenuItem(
-                roomCallState = roomCallState,
-                onJoinCallClick = onJoinCallClick,
-                isCallRestricted = isCallRestricted,
-                modifier = modifier,
-            )
+            if (isCallRestricted) {
+                Box(modifier)
+            } else {
+                OnGoingCallMenuItem(
+                    roomCallState = roomCallState,
+                    onJoinCallClick = onJoinCallClick,
+                    modifier = modifier,
+                )
+            }
         }
     }
 }
@@ -83,7 +90,6 @@ private fun StandByCallMenuItem(
     roomCallState: RoomCallState.StandBy,
     onJoinCallClick: () -> Unit,
     onStartCallWithType: ((videoEnabled: Boolean) -> Unit)?,
-    isCallRestricted: Boolean,
     modifier: Modifier = Modifier,
 ) {
     var showChooser by remember { mutableStateOf(false) }
@@ -96,7 +102,7 @@ private fun StandByCallMenuItem(
                 onJoinCallClick()
             }
         },
-        enabled = roomCallState.canStartCall && !isCallRestricted,
+        enabled = roomCallState.canStartCall,
     ) {
         Icon(
             // A plain phone icon when the chooser is available (the tap asks voice vs video);
@@ -177,7 +183,6 @@ private fun CallTypeChooserDialog(
 private fun OnGoingCallMenuItem(
     roomCallState: RoomCallState.OnGoing,
     onJoinCallClick: () -> Unit,
-    isCallRestricted: Boolean,
     modifier: Modifier = Modifier,
 ) {
     if (!roomCallState.isUserLocallyInTheCall) {
@@ -189,7 +194,7 @@ private fun OnGoingCallMenuItem(
             ),
             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
             modifier = modifier.heightIn(min = 36.dp),
-            enabled = roomCallState.canJoinCall && !isCallRestricted,
+            enabled = roomCallState.canJoinCall,
         ) {
             Icon(
                 modifier = Modifier.size(20.dp),

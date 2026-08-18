@@ -67,6 +67,7 @@ class StartChatFlowNode(
         overlay = overlay,
         openRoom = callback::onRoomCreated,
         openRoomDirectory = callback::navigateToRoomDirectory,
+        openScanQrCode = callback::onScanQrCode,
     )
 
     override fun resolve(navTarget: NavTarget, buildContext: BuildContext): Node {

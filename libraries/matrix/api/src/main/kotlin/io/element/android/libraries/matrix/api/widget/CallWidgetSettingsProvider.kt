@@ -17,5 +17,8 @@ interface CallWidgetSettingsProvider {
         encrypted: Boolean,
         direct: Boolean,
         hasActiveCall: Boolean,
+        // Voice call: pick the DM "voice" intent so Element Call starts with the camera off.
+        // Only effective for DM rooms (the only rooms with a *_DM_VOICE intent).
+        startWithVideoMuted: Boolean = false,
     ): MatrixWidgetSettings
 }

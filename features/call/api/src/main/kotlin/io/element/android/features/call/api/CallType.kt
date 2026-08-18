@@ -27,9 +27,11 @@ sealed interface CallType : NodeInputs, Parcelable {
         val sessionId: SessionId,
         val roomId: RoomId,
         /**
-         * When true the call is started as a "voice call": the embedded Element Call URL is asked
-         * to start with the camera off (best-effort — the pre-join lobby still lets the user change
-         * it). Element Call has no native audio-only mode, so this is how a voice call is expressed.
+         * When true the call is started as a "voice call": for a DM room this selects Element
+         * Call's *_DM_VOICE widget intent, which starts the call with the camera off (audio on).
+         * Element Call has no native audio-only mode; the voice intent is how it's expressed. For a
+         * non-DM room there is no voice intent, so the camera-off request falls back to the pre-join
+         * lobby where the user can turn the camera off manually.
          */
         val startWithVideoMuted: Boolean = false,
     ) : CallType {

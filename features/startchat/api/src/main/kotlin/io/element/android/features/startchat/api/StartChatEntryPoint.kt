@@ -24,5 +24,6 @@ interface StartChatEntryPoint : FeatureEntryPoint {
     interface Callback : Plugin {
         fun onRoomCreated(roomIdOrAlias: RoomIdOrAlias, serverNames: List<String>)
         fun navigateToRoomDirectory()
+        fun onScanQrCode()
     }
 }

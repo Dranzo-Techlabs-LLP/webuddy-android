@@ -89,14 +89,16 @@ class HomePresenter(
             walletService.refreshPendingRefundRequests(client.sessionId.value)
         }
 
-        // Keep the chat-list refund badge near-real-time. Until we have push, this polls the bulk
-        // pending-for-consultant endpoint at a steady interval so a new request from a client lands
-        // on the consultant's chat list within seconds — not "next time you reopen the app." The
-        // WalletService method short-circuits to a no-op when the user is not a consultant, so
-        // running the loop unconditionally is safe.
+        // Keep the top-bar balance and the chat-list refund badge near-real-time. Until we have
+        // push, this polls at a steady interval so a wallet change made on the backend — a debit
+        // from the other side of a chat, a credit from settlement/refund, or a new refund request —
+        // lands within seconds, not "next time you reopen the app." Both WalletService methods are
+        // safe to call repeatedly for the same user, and refreshPendingRefundRequests is a no-op for
+        // non-consultants, so running the loop unconditionally is fine.
         LaunchedEffect(client.sessionId) {
             while (true) {
                 delay(8.seconds)
+                walletService.refreshBalance(client.sessionId.value)
                 walletService.refreshPendingRefundRequests(client.sessionId.value)
             }
         }

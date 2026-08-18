@@ -172,13 +172,23 @@ class MessageComposerPresenter(
         // whenever the role/balance state hadn't loaded yet, which made the "Recharge your wallet"
         // banner flash on every chat-open for consultants (whose isCurrentUserConsultant flag is
         // null at first paint, falling through to the loading-default-restricted branch).
+        //
+        // Affordability is knowable from the client's balance + the consultant's rate ALONE — it
+        // does NOT need holdExists. Keying the gate on isWalletLoaded (which requires holdExists)
+        // let a null/errored hold-check keep the chat AND the call button open indefinitely for a
+        // client who genuinely can't afford the consultant. So gate on balance+rate directly and
+        // keep only the holdExists==true exemption (an active hold covers chat and call).
         val isRestricted = when {
             otherUserId == null -> false
             isCurrentUserConsultant == true -> false           // confirmed consultant
             isCurrentUserConsultant == null -> false           // unknown role — don't gate, wait
-            holdExists == true -> false                         // active hold covers the chat
-            !isWalletLoaded -> false                            // confirmed not-consultant, still loading — don't gate
-            else -> (credits ?: 0) < (recipientMaxCredits ?: 100)
+            holdExists == true -> false                         // active hold covers chat AND call
+            else -> {
+                val balance = credits
+                val rate = recipientMaxCredits
+                // Restrict only once BOTH balance and rate are known and the balance is short.
+                balance != null && rate != null && balance < rate
+            }
         }
 
         LaunchedEffect(otherUserId, isCurrentUserConsultant) {

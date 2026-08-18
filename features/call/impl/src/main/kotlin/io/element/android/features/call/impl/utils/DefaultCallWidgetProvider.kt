@@ -47,23 +47,23 @@ class DefaultCallWidgetProvider(
 
         val roomInfo = room.info()
         val isEncrypted = roomInfo.isEncrypted ?: room.getUpdatedIsEncrypted().getOrThrow()
+        // Voice call: startWithVideoMuted selects the DM "voice" widget intent
+        // (START_CALL_DM_VOICE / JOIN_EXISTING_DM_VOICE), which makes Element Call start with the
+        // camera off. This is the only mechanism EC honors — it derives the initial camera state
+        // from the intent, not from any URL/video param.
         val widgetSettings = callWidgetSettingsProvider.provide(
             baseUrl = baseUrl,
             encrypted = isEncrypted,
             direct = room.isDm(),
             hasActiveCall = roomInfo.hasRoomCall,
+            startWithVideoMuted = startWithVideoMuted,
         )
-        val generatedUrl = room.generateWidgetWebViewUrl(
+        val callUrl = room.generateWidgetWebViewUrl(
             widgetSettings = widgetSettings,
             clientId = clientId,
             languageTag = languageTag,
             theme = theme,
         ).getOrThrow()
-
-        // Voice call: best-effort request that Element Call start with the camera off. Element Call
-        // reads media defaults from the widget-URL fragment; appending `video=false` is harmless if
-        // the embedded EC build ignores it (the pre-join lobby still lets the user pick devices).
-        val callUrl = if (startWithVideoMuted) appendVideoMutedParam(generatedUrl) else generatedUrl
 
         val driver = room.getWidgetDriver(widgetSettings).getOrThrow()
 
@@ -71,19 +71,5 @@ class DefaultCallWidgetProvider(
             driver = driver,
             url = callUrl,
         )
-    }
-
-    /**
-     * Append `video=false` to the Element Call widget URL's fragment query so the call starts with
-     * the camera off. Element Call places its parameters in the fragment as a query string
-     * (`…index.html#?a=1&b=2`); we add to that when present, or create it otherwise.
-     */
-    private fun appendVideoMutedParam(url: String): String {
-        val hashIndex = url.indexOf('#')
-        return when {
-            hashIndex == -1 -> "$url#?video=false"
-            url.endsWith("#") -> "${url}?video=false"
-            else -> "$url&video=false"
-        }
     }
 }

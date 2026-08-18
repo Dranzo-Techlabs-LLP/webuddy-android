@@ -59,4 +59,23 @@
 
     <string name="clariva_auth_error_title">Sign-in failed</string>
     <string name="clariva_auth_error_generic">Something went wrong. Please try again.</string>
+
+    <!-- Live email availability on the sign-up form (mirrors the username check). -->
+    <string name="clariva_auth_email_checking">Checking availability…</string>
+    <string name="clariva_auth_email_available">Email is available</string>
+    <string name="clariva_auth_email_taken">That email is already registered. Sign in instead.</string>
+    <string name="clariva_auth_email_invalid">Enter a valid email address</string>
+
+    <!-- Forgot / reset password (6-digit code by email). -->
+    <string name="clariva_auth_forgot_password">Forgot password?</string>
+    <string name="clariva_forgot_title">Reset password</string>
+    <string name="clariva_forgot_email_subtitle">Enter your account email and we\'ll send you a 6-digit reset code.</string>
+    <string name="clariva_forgot_send_code">Send code</string>
+    <string name="clariva_forgot_code_subtitle">If an account exists for %1$s, a 6-digit code is on its way. Enter it below with your new password.</string>
+    <string name="clariva_forgot_code_label">6-digit code</string>
+    <string name="clariva_forgot_new_password_label">New password</string>
+    <string name="clariva_forgot_submit">Reset password</string>
+    <string name="clariva_forgot_resend">Resend code</string>
+    <string name="clariva_forgot_cancel">Cancel</string>
+    <string name="clariva_forgot_success">Password reset. Sign in with your new password.</string>
 </resources>

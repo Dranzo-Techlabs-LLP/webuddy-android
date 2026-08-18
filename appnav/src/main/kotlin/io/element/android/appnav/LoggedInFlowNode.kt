@@ -61,6 +61,7 @@ import io.element.android.features.networkmonitor.api.ui.ConnectivityIndicatorCo
 import io.element.android.features.preferences.api.PreferencesEntryPoint
 import io.element.android.features.roomdirectory.api.RoomDescription
 import io.element.android.features.roomdirectory.api.RoomDirectoryEntryPoint
+import io.element.android.features.scanqrcode.api.ScanQrCodeEntryPoint
 import io.element.android.features.securebackup.api.SecureBackupEntryPoint
 import io.element.android.features.share.api.ShareEntryPoint
 import io.element.android.features.startchat.api.StartChatEntryPoint
@@ -146,6 +147,7 @@ class LoggedInFlowNode(
     private val analyticsService: AnalyticsService,
     private val analyticsRoomListStateWatcher: AnalyticsRoomListStateWatcher,
     private val createRoomEntryPoint: CreateRoomEntryPoint,
+    private val scanQrCodeEntryPoint: ScanQrCodeEntryPoint,
 ) : BaseFlowNode<LoggedInFlowNode.NavTarget>(
     backstack = BackStack(
         initialElement = NavTarget.Placeholder,
@@ -288,6 +290,9 @@ class LoggedInFlowNode(
 
         @Parcelize
         data object CreateRoom : NavTarget
+
+        @Parcelize
+        data object ScanQrCode : NavTarget
 
         @Parcelize
         data object CreateSpace : NavTarget
@@ -470,9 +475,34 @@ class LoggedInFlowNode(
                     override fun navigateToRoomDirectory() {
                         backstack.push(NavTarget.RoomDirectory)
                     }
+
+                    override fun onScanQrCode() {
+                        backstack.push(NavTarget.ScanQrCode)
+                    }
                 }
 
                 startChatEntryPoint.createNode(
+                    parentNode = this,
+                    buildContext = buildContext,
+                    callback = callback,
+                )
+            }
+            NavTarget.ScanQrCode -> {
+                val callback = object : ScanQrCodeEntryPoint.Callback {
+                    override fun onUserScanned(userId: UserId) {
+                        // REPLACE (not push) the scanner with the profile: this removes the scanner
+                        // node from the backstack so (a) backing out of the profile returns to the
+                        // New-chat screen instead of a live camera, and (b) the scanner's
+                        // LaunchedEffect(scannedUserId) can't re-fire and bounce back to the profile
+                        // when the covered node's composition would otherwise be recreated.
+                        backstack.replace(NavTarget.UserProfile(userId))
+                    }
+
+                    override fun onCancel() {
+                        backstack.pop()
+                    }
+                }
+                scanQrCodeEntryPoint.createNode(
                     parentNode = this,
                     buildContext = buildContext,
                     callback = callback,

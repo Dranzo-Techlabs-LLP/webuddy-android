@@ -207,6 +207,58 @@ class ClarivaAuthService(
         }
     }
 
+    /**
+     * Is this email free to register? Returns null when the check could not be
+     * made (offline / server down) so the caller stays silent rather than wrongly
+     * claiming it is taken.
+     */
+    suspend fun isEmailAvailable(email: String): ClarivaEmailAvailability? {
+        return try {
+            clarivaAuthApi.emailAvailable(email.trim())
+        } catch (e: Exception) {
+            Timber.d(e, "Email availability check failed for $email")
+            null
+        }
+    }
+
+    /**
+     * Ask the server to email a password-reset code. The server always reports
+     * success regardless of whether the email exists, so a success result here
+     * only means "the request was accepted", not "the email is registered".
+     */
+    suspend fun requestPasswordReset(email: String): Result<Unit> {
+        return try {
+            clarivaAuthApi.forgotPassword(ClarivaForgotPasswordRequest(email = email.trim()))
+            Result.success(Unit)
+        } catch (e: HttpException) {
+            Timber.w(e, "forgot-password failed with HTTP ${e.code()}")
+            Result.failure(ClarivaAuthException(mapHttpError(e), e))
+        } catch (e: Exception) {
+            Timber.e(e, "forgot-password failed")
+            Result.failure(ClarivaAuthException("Could not reach Clariva. Check your connection and try again.", e))
+        }
+    }
+
+    /** Complete the reset with the emailed [code] and a [newPassword]. */
+    suspend fun resetPassword(email: String, code: String, newPassword: String): Result<Unit> {
+        return try {
+            clarivaAuthApi.resetPassword(
+                ClarivaResetPasswordRequest(
+                    email = email.trim(),
+                    code = code.trim(),
+                    newPassword = newPassword,
+                )
+            )
+            Result.success(Unit)
+        } catch (e: HttpException) {
+            Timber.w(e, "reset-password failed with HTTP ${e.code()}")
+            Result.failure(ClarivaAuthException(mapHttpError(e), e))
+        } catch (e: Exception) {
+            Timber.e(e, "reset-password failed")
+            Result.failure(ClarivaAuthException("Could not reach Clariva. Check your connection and try again.", e))
+        }
+    }
+
     fun clear() {
         token = null
         lastAuthenticatedUser = null
