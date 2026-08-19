@@ -79,6 +79,9 @@ internal fun TimelineItemRow(
     isCallRestricted: Boolean = false,
     // Media type of the room's ongoing call — drives the join button's phone-vs-camera icon.
     ongoingCallIsVideo: Boolean = false,
+    // True only for the NEWEST "Call started" event — the one representing the current call.
+    // Older call tiles are plain history and never show a Join action.
+    isLatestRtcNotification: Boolean = false,
     eventContentView: @Composable (TimelineItem.Event, Modifier, (ContentAvoidingLayoutData) -> Unit) -> Unit =
         { event, contentModifier, onContentLayoutChange ->
             TimelineItemEventContentView(
@@ -136,6 +139,7 @@ internal fun TimelineItemRow(
                             onJoinCallClick = onJoinCallClick,
                             isCallRestricted = isCallRestricted,
                             ongoingCallIsVideo = ongoingCallIsVideo,
+                            isLatestRtcNotification = isLatestRtcNotification,
                         )
                     }
                     else -> {

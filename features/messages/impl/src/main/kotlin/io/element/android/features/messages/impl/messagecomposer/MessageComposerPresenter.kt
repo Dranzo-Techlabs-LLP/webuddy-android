@@ -86,6 +86,7 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -193,18 +194,29 @@ class MessageComposerPresenter(
 
         LaunchedEffect(otherUserId, isCurrentUserConsultant) {
             val myUserId = room.sessionId.value
-            walletService.refreshBalance(myUserId)
+            // The three wallet reads are independent — run them CONCURRENTLY so the chat gate
+            // (credits + restriction) resolves in ~one network round-trip instead of three serial
+            // ones, which was the main reason the composer felt slow to unlock on chat open.
+            launch { walletService.refreshBalance(myUserId) }
             // Consultants never gate on hold/recipient credits — those values only drive client-side
             // payment restriction. Calling checkHoldExists with the consultant as clientId is a
             // role-inverted query that always returns false anyway (the hold's stored clientId is
             // the OTHER user). Skip it entirely.
             if (isCurrentUserConsultant != true) {
-                otherUserId?.let {
-                    try {
-                        holdExistsState.value = walletService.checkHoldExists(myUserId, it)
-                        recipientMaxCreditsState.value = walletService.getMaxCredits(it)
-                    } catch (e: Exception) {
-                        Timber.e(e, "Failed to fetch recipient wallet info")
+                otherUserId?.let { target ->
+                    launch {
+                        try {
+                            holdExistsState.value = walletService.checkHoldExists(myUserId, target)
+                        } catch (e: Exception) {
+                            Timber.e(e, "Failed to fetch hold state")
+                        }
+                    }
+                    launch {
+                        try {
+                            recipientMaxCreditsState.value = walletService.getMaxCredits(target)
+                        } catch (e: Exception) {
+                            Timber.e(e, "Failed to fetch recipient rate")
+                        }
                     }
                 }
             }
@@ -220,12 +232,24 @@ class MessageComposerPresenter(
             val myUserId = room.sessionId.value
             while (true) {
                 delay(60.seconds)
-                walletService.refreshBalance(myUserId)
-                try {
-                    holdExistsState.value = walletService.checkHoldExists(myUserId, target)
-                    recipientMaxCreditsState.value = walletService.getMaxCredits(target)
-                } catch (e: Exception) {
-                    Timber.e(e, "Failed to refresh recipient wallet info in loop")
+                // Same concurrency as the initial load; coroutineScope joins all three before the
+                // next delay so slow rounds can't pile up.
+                coroutineScope {
+                    launch { walletService.refreshBalance(myUserId) }
+                    launch {
+                        try {
+                            holdExistsState.value = walletService.checkHoldExists(myUserId, target)
+                        } catch (e: Exception) {
+                            Timber.e(e, "Failed to refresh hold state in loop")
+                        }
+                    }
+                    launch {
+                        try {
+                            recipientMaxCreditsState.value = walletService.getMaxCredits(target)
+                        } catch (e: Exception) {
+                            Timber.e(e, "Failed to refresh recipient rate in loop")
+                        }
+                    }
                 }
             }
         }

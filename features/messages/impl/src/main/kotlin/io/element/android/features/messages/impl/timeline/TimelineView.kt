@@ -58,6 +58,7 @@ import io.element.android.features.messages.impl.timeline.di.aFakeTimelineItemPr
 import io.element.android.features.messages.impl.timeline.focus.FocusRequestStateView
 import io.element.android.features.messages.impl.timeline.model.NewEventState
 import io.element.android.features.messages.impl.timeline.model.TimelineItem
+import io.element.android.features.messages.impl.timeline.model.event.TimelineItemRtcNotificationContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemEventContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemEventContentProvider
 import io.element.android.features.messages.impl.timeline.protection.TimelineProtectionState
@@ -150,6 +151,15 @@ fun TimelineView(
         state.eventSink(TimelineEvents.LoadMore(Timeline.PaginationDirection.BACKWARDS))
     }
 
+    // Only the NEWEST "Call started" tile represents the room's current call — older ones are
+    // plain history and must not grow a Join action while a call is ongoing (with reverseLayout,
+    // timelineItems.first() is the newest event).
+    val latestRtcNotificationId = remember(state.timelineItems) {
+        state.timelineItems.firstOrNull { item ->
+            item is TimelineItem.Event && item.content is TimelineItemRtcNotificationContent
+        }?.identifier()
+    }
+
     // Animate alpha when timeline is first displayed, to avoid flashes or glitching when viewing rooms
     AnimatedVisibility(visible = true, enter = fadeIn()) {
         Box(modifier) {
@@ -190,6 +200,7 @@ fun TimelineView(
                         onJoinCallClick = onJoinCallClick,
                         isCallRestricted = isCallRestricted,
                         ongoingCallIsVideo = ongoingCallIsVideo,
+                        isLatestRtcNotification = timelineItem.identifier() == latestRtcNotificationId,
                         eventSink = state.eventSink,
                     )
                 }

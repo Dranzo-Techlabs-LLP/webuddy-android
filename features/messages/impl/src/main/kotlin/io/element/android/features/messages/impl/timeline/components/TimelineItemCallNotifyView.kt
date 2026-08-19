@@ -53,6 +53,8 @@ internal fun TimelineItemCallNotifyView(
     isCallRestricted: Boolean = false,
     // Media type of the room's ongoing call — drives the icons so a voice call never shows as video.
     ongoingCallIsVideo: Boolean = false,
+    // Only the newest "Call started" tile (the current call) offers Join; older tiles are history.
+    isLatestRtcNotification: Boolean = false,
 ) {
     Row(
         modifier = modifier
@@ -86,11 +88,11 @@ internal fun TimelineItemCallNotifyView(
             ) {
                 Icon(
                     modifier = Modifier.size(20.sp.toDp()),
-                    // While the room's call is ONGOING the icon reflects its actual media type
-                    // (wallet call-type record). Historical tiles keep the neutral phone icon —
-                    // the Matrix call event carries no voice/video field, so a finished call's
-                    // type is unknowable; the old hardcoded camera wrongly claimed video for all.
-                    imageVector = if (roomCallState is RoomCallState.OnGoing && ongoingCallIsVideo) {
+                    // Only the CURRENT call's tile reflects the live media type (wallet call-type
+                    // record). Historical tiles keep the neutral phone icon — the Matrix call
+                    // event carries no voice/video field, so a finished call's type is unknowable;
+                    // the old hardcoded camera wrongly claimed video for all.
+                    imageVector = if (roomCallState is RoomCallState.OnGoing && isLatestRtcNotification && ongoingCallIsVideo) {
                         CompoundIcons.VideoCallSolid()
                     } else {
                         CompoundIcons.VoiceCallSolid()
@@ -107,7 +109,11 @@ internal fun TimelineItemCallNotifyView(
                 )
             }
         }
-        if (roomCallState is RoomCallState.OnGoing) {
+        // Join renders ONLY on the newest call tile while its call is ongoing. Older "Call
+        // started" tiles are immutable history — without the isLatestRtcNotification gate, an
+        // incoming call made EVERY historical tile sprout a Join button, turning the whole chat
+        // history into what looked like actionable notifications.
+        if (roomCallState is RoomCallState.OnGoing && isLatestRtcNotification) {
             CallMenuItem(
                 roomCallState = roomCallState,
                 onJoinCallClick = onJoinCallClick,
