@@ -16,6 +16,7 @@ import io.element.android.features.messages.impl.timeline.factories.event.Timeli
 import io.element.android.features.messages.impl.timeline.factories.virtual.TimelineItemVirtualFactory
 import io.element.android.features.messages.impl.timeline.groups.TimelineItemGrouper
 import io.element.android.features.messages.impl.timeline.model.TimelineItem
+import io.element.android.features.messages.impl.timeline.model.event.TimelineItemUnknownContent
 import io.element.android.libraries.androidutils.diff.DiffCacheUpdater
 import io.element.android.libraries.androidutils.diff.MutableListDiffCache
 import io.element.android.libraries.core.coroutine.CoroutineDispatchers
@@ -95,7 +96,14 @@ class TimelineItemsFactory(
                 newTimelineItemStates.add(updatedItem)
             }
         }
-        val result = timelineItemGrouper.group(newTimelineItemStates).toImmutableList()
+        // Drop "Unsupported event" bubbles entirely. They render internal machinery events the app
+        // has no view for — most visibly the m.rtc.decline the SDK sends when a callee declines a
+        // call, which showed up in the chat as an error-looking "Unsupported event" item. Hiding
+        // them keeps the history clean; everything renderable is unaffected.
+        val visibleItems = newTimelineItemStates.filterNot { item ->
+            item is TimelineItem.Event && item.content is TimelineItemUnknownContent
+        }
+        val result = timelineItemGrouper.group(visibleItems).toImmutableList()
         this._timelineItems.emit(result)
     }
 

@@ -184,10 +184,16 @@ class MessageComposerPresenter(
             isCurrentUserConsultant == true -> false           // confirmed consultant
             isCurrentUserConsultant == null -> false           // unknown role — don't gate, wait
             holdExists == true -> false                         // active hold covers chat AND call
+            // Hold state UNKNOWN (still loading, or the check errored): do NOT restrict. A client
+            // inside a paid 24h session typically has balance < rate (the hold already debited
+            // them), so gating before the hold check resolves flashed a false "Chat restricted —
+            // recharge" banner at every chat open (and stuck for 60s on a failed check). The
+            // server enforces billing on initiateHold regardless, so failing open here is safe.
+            holdExists == null -> false
             else -> {
                 val balance = credits
                 val rate = recipientMaxCredits
-                // Restrict only once BOTH balance and rate are known and the balance is short.
+                // Confirmed NO hold: restrict once both balance and rate are known and short.
                 balance != null && rate != null && balance < rate
             }
         }
