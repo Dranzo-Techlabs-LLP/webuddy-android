@@ -252,6 +252,7 @@ fun MessagesView(
                                 // Gate the call button on the same credit rule as the chat composer:
                                 // a client who can't afford the consultant can't start/join a call.
                                 isCallRestricted = state.composerState.isRestricted,
+                                ongoingCallIsVideo = state.ongoingCallIsVideo,
                                 onSummarizeClick = { duration ->
                                     if (duration != null) {
                                         state.eventSink(MessagesEvents.Summarize(duration))
@@ -565,6 +566,7 @@ private fun MessagesViewContent(
                 // Gate the in-timeline "Call started" join button on the same credit rule as the
                 // top-bar call button so a credit-restricted client cannot join from either place.
                 isCallRestricted = state.composerState.isRestricted,
+                ongoingCallIsVideo = state.ongoingCallIsVideo,
                 nestedScrollConnection = scrollBehavior.nestedScrollConnection,
             )
 

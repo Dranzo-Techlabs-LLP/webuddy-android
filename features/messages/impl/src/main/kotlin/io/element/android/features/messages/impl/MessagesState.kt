@@ -69,6 +69,8 @@ data class MessagesState(
     val refundRequestId: String? = null,
     /** Held amount for this pair, so the consultant can bound the partial-refund input. Null if unknown. */
     val refundHeldAmount: Double? = null,
+    /** Whether the room's ONGOING call is a video call (drives the Join buttons' icon). */
+    val ongoingCallIsVideo: Boolean = false,
     /**
      * Chat-local toast events (string-resource ids). Emitted by [MessagesPresenter] for refund
      * approve / reject / request-sent / request-failed feedback. The chat view shows them on its

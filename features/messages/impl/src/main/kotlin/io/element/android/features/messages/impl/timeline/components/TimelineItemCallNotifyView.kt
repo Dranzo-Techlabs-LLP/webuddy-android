@@ -51,6 +51,8 @@ internal fun TimelineItemCallNotifyView(
     // Same client credit gate as the top-bar call button: a client who can't afford the consultant
     // must not be able to join an ongoing call from this in-timeline tile either.
     isCallRestricted: Boolean = false,
+    // Media type of the room's ongoing call — drives the icons so a voice call never shows as video.
+    ongoingCallIsVideo: Boolean = false,
 ) {
     Row(
         modifier = modifier
@@ -84,10 +86,15 @@ internal fun TimelineItemCallNotifyView(
             ) {
                 Icon(
                     modifier = Modifier.size(20.sp.toDp()),
-                    // Neutral phone icon: the Matrix call event carries no voice/video field, so
-                    // this tile cannot know which kind the call was — the old hardcoded video
-                    // camera wrongly presented every (mostly voice) call as video.
-                    imageVector = CompoundIcons.VoiceCallSolid(),
+                    // While the room's call is ONGOING the icon reflects its actual media type
+                    // (wallet call-type record). Historical tiles keep the neutral phone icon —
+                    // the Matrix call event carries no voice/video field, so a finished call's
+                    // type is unknowable; the old hardcoded camera wrongly claimed video for all.
+                    imageVector = if (roomCallState is RoomCallState.OnGoing && ongoingCallIsVideo) {
+                        CompoundIcons.VideoCallSolid()
+                    } else {
+                        CompoundIcons.VoiceCallSolid()
+                    },
                     contentDescription = null,
                     tint = ElementTheme.colors.iconSecondary,
                 )
@@ -105,6 +112,7 @@ internal fun TimelineItemCallNotifyView(
                 roomCallState = roomCallState,
                 onJoinCallClick = onJoinCallClick,
                 isCallRestricted = isCallRestricted,
+                ongoingCallIsVideo = ongoingCallIsVideo,
             )
         } else {
             Text(

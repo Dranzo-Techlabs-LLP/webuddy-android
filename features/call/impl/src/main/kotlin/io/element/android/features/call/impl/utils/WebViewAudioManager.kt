@@ -44,6 +44,13 @@ class WebViewAudioManager(
     private val webView: WebView,
     private val coroutineScope: CoroutineScope,
     private val onInvalidAudioDeviceAdded: (InvalidAudioDeviceReason) -> Unit,
+    /**
+     * Drives the DEFAULT audio route: a video call defaults to the loudspeaker, a voice call to
+     * the earpiece (like a phone call). Only the built-in speaker/earpiece priority flips —
+     * bluetooth/USB/wired devices always take precedence, and the user can still switch manually
+     * in-call.
+     */
+    private val isVideoCall: Boolean = true,
 ) {
     private val json by lazy {
         Json {
@@ -64,23 +71,31 @@ class WebViewAudioManager(
     private val isWebViewAudioEnabled = AtomicBoolean(true)
 
     /**
-     * The list of device types that are considered as communication devices, sorted by likelihood of it being used for communication.
+     * The list of device types that are considered as communication devices, sorted by likelihood
+     * of it being used for communication. External devices (bluetooth/USB/wired) always come
+     * first; the relative order of the built-in speaker vs earpiece depends on the call type —
+     * video defaults to the loudspeaker, voice defaults to the earpiece.
      */
-    private val wantedDeviceTypes = listOf(
+    private val wantedDeviceTypes = buildList {
         // Paired bluetooth device with microphone
-        AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+        add(AudioDeviceInfo.TYPE_BLUETOOTH_SCO)
         // USB devices which can play or record audio
-        AudioDeviceInfo.TYPE_USB_HEADSET,
-        AudioDeviceInfo.TYPE_USB_DEVICE,
-        AudioDeviceInfo.TYPE_USB_ACCESSORY,
+        add(AudioDeviceInfo.TYPE_USB_HEADSET)
+        add(AudioDeviceInfo.TYPE_USB_DEVICE)
+        add(AudioDeviceInfo.TYPE_USB_ACCESSORY)
         // Wired audio devices
-        AudioDeviceInfo.TYPE_WIRED_HEADSET,
-        AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
-        // The built-in speaker of the device
-        AudioDeviceInfo.TYPE_BUILTIN_SPEAKER,
-        // The built-in earpiece of the device
-        AudioDeviceInfo.TYPE_BUILTIN_EARPIECE,
-    )
+        add(AudioDeviceInfo.TYPE_WIRED_HEADSET)
+        add(AudioDeviceInfo.TYPE_WIRED_HEADPHONES)
+        if (isVideoCall) {
+            // Video call: loudspeaker by default.
+            add(AudioDeviceInfo.TYPE_BUILTIN_SPEAKER)
+            add(AudioDeviceInfo.TYPE_BUILTIN_EARPIECE)
+        } else {
+            // Voice call: earpiece by default, like a regular phone call.
+            add(AudioDeviceInfo.TYPE_BUILTIN_EARPIECE)
+            add(AudioDeviceInfo.TYPE_BUILTIN_SPEAKER)
+        }
+    }
 
     private val audioManager = webView.context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 

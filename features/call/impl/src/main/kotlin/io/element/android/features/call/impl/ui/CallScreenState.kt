@@ -16,5 +16,7 @@ data class CallScreenState(
     val userAgent: String,
     val isCallActive: Boolean,
     val isInWidgetMode: Boolean,
+    /** Drives the default audio route: video call -> loudspeaker, voice call -> earpiece. */
+    val isVideoCall: Boolean = true,
     val eventSink: (CallScreenEvents) -> Unit,
 )

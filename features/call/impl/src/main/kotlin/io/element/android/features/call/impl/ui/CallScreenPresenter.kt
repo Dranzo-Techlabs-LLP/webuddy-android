@@ -202,6 +202,9 @@ class CallScreenPresenter(
             userAgent = userAgent,
             isCallActive = isWidgetLoaded,
             isInWidgetMode = isInWidgetMode,
+            // A voice call (startWithVideoMuted) defaults the audio route to the earpiece; video
+            // calls (and external-url calls, which have no media hint) default to the loudspeaker.
+            isVideoCall = (callType as? CallType.RoomCall)?.startWithVideoMuted?.not() ?: true,
             eventSink = ::handleEvent,
         )
     }

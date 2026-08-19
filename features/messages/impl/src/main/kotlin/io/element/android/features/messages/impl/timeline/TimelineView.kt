@@ -104,6 +104,8 @@ fun TimelineView(
     modifier: Modifier = Modifier,
     // Client credit gate propagated to the in-timeline "Call started" join button (feature #3).
     isCallRestricted: Boolean = false,
+    // Media type of the room's ongoing call — drives the join button's phone-vs-camera icon.
+    ongoingCallIsVideo: Boolean = false,
     lazyListState: LazyListState = rememberLazyListState(),
     forceJumpToBottomVisibility: Boolean = false,
     nestedScrollConnection: NestedScrollConnection = rememberNestedScrollInteropConnection(),
@@ -187,6 +189,7 @@ fun TimelineView(
                         onSwipeToReply = onSwipeToReply,
                         onJoinCallClick = onJoinCallClick,
                         isCallRestricted = isCallRestricted,
+                        ongoingCallIsVideo = ongoingCallIsVideo,
                         eventSink = state.eventSink,
                     )
                 }

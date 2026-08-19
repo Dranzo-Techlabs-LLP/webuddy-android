@@ -187,6 +187,17 @@ class MessagesPresenter(
         val readReceiptBottomSheetState = readReceiptBottomSheetPresenter.present()
         val pinnedMessagesBannerState = pinnedMessagesBannerPresenter.present()
         val roomCallState = roomCallStatePresenter.present()
+
+        // Media type of the room's ONGOING call (drives the Join buttons' phone-vs-camera icon).
+        // Resolved from the wallet call-type record whenever a call becomes ongoing; defaults to
+        // voice when unknown, matching the voice-first product.
+        var ongoingCallIsVideo by remember { mutableStateOf(false) }
+        val hasOngoingCall = roomCallState is io.element.android.features.roomcall.api.RoomCallState.OnGoing
+        LaunchedEffect(hasOngoingCall) {
+            if (hasOngoingCall) {
+                ongoingCallIsVideo = walletService.getRoomCallType(room.roomId.value) == "video"
+            }
+        }
         val roomMemberModerationState = roomMemberModerationPresenter.present()
 
         val userEventPermissions by room.permissionsAsState(UserEventPermissions.DEFAULT) { perms ->
@@ -612,6 +623,7 @@ class MessagesPresenter(
             isConsultantInThisRoom = isConsultantInThisRoom.value,
             refundRequestId = refundRequestId.value,
             refundHeldAmount = refundHeldAmount.value,
+            ongoingCallIsVideo = ongoingCallIsVideo,
             chatTransientEvents = chatTransientEvents,
             eventSink = ::handleEvent,
         )

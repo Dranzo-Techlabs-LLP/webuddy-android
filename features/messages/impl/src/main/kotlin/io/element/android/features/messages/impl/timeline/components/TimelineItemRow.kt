@@ -77,6 +77,8 @@ internal fun TimelineItemRow(
     modifier: Modifier = Modifier,
     // Client credit gate for the in-timeline "Call started" join button (feature #3).
     isCallRestricted: Boolean = false,
+    // Media type of the room's ongoing call — drives the join button's phone-vs-camera icon.
+    ongoingCallIsVideo: Boolean = false,
     eventContentView: @Composable (TimelineItem.Event, Modifier, (ContentAvoidingLayoutData) -> Unit) -> Unit =
         { event, contentModifier, onContentLayoutChange ->
             TimelineItemEventContentView(
@@ -133,6 +135,7 @@ internal fun TimelineItemRow(
                             onLongClick = onLongClick,
                             onJoinCallClick = onJoinCallClick,
                             isCallRestricted = isCallRestricted,
+                            ongoingCallIsVideo = ongoingCallIsVideo,
                         )
                     }
                     else -> {

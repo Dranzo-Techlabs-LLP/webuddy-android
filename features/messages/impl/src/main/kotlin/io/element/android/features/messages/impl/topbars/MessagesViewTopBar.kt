@@ -72,6 +72,7 @@ internal fun MessagesViewTopBar(
     onJoinCallClick: () -> Unit,
     onStartCallWithType: ((videoEnabled: Boolean) -> Unit)?,
     isCallRestricted: Boolean,
+    ongoingCallIsVideo: Boolean,
     onBackClick: () -> Unit,
     onSummarizeClick: (SummaryDuration?) -> Unit,
     isRefundButtonVisible: Boolean,
@@ -185,6 +186,7 @@ internal fun MessagesViewTopBar(
                 onJoinCallClick = onJoinCallClick,
                 onStartCallWithType = onStartCallWithType,
                 isCallRestricted = isCallRestricted,
+                ongoingCallIsVideo = ongoingCallIsVideo,
             )
             Spacer(Modifier.width(8.dp))
         },
@@ -258,6 +260,7 @@ internal fun MessagesViewTopBarPreview() = ElementPreview {
         onJoinCallClick = {},
         onStartCallWithType = null,
         isCallRestricted = false,
+        ongoingCallIsVideo = false,
         onBackClick = {},
         onSummarizeClick = {},
     )

@@ -54,6 +54,9 @@ internal fun CallMenuItem(
     // HIDDEN entirely — mirroring how the chat composer is replaced by the recharge banner. Never
     // true for the consultant.
     isCallRestricted: Boolean = false,
+    // Media type of the ONGOING call (from the wallet call-type record): drives the Join button's
+    // phone-vs-camera icon so a voice call never advertises itself as video.
+    ongoingCallIsVideo: Boolean = false,
 ) {
     when (roomCallState) {
         RoomCallState.Unavailable -> {
@@ -78,6 +81,7 @@ internal fun CallMenuItem(
                 OnGoingCallMenuItem(
                     roomCallState = roomCallState,
                     onJoinCallClick = onJoinCallClick,
+                    isVideoCall = ongoingCallIsVideo,
                     modifier = modifier,
                 )
             }
@@ -183,6 +187,7 @@ private fun CallTypeChooserDialog(
 private fun OnGoingCallMenuItem(
     roomCallState: RoomCallState.OnGoing,
     onJoinCallClick: () -> Unit,
+    isVideoCall: Boolean,
     modifier: Modifier = Modifier,
 ) {
     if (!roomCallState.isUserLocallyInTheCall) {
@@ -198,7 +203,8 @@ private fun OnGoingCallMenuItem(
         ) {
             Icon(
                 modifier = Modifier.size(20.dp),
-                imageVector = CompoundIcons.VideoCallSolid(),
+                // Match the ongoing call's actual media type (wallet call-type record).
+                imageVector = if (isVideoCall) CompoundIcons.VideoCallSolid() else CompoundIcons.VoiceCallSolid(),
                 contentDescription = null
             )
             Spacer(Modifier.width(8.dp))
