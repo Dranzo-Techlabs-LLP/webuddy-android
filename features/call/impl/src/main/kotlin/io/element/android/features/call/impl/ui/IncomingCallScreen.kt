@@ -34,7 +34,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.tokens.generated.CompoundIcons
-import io.element.android.features.call.impl.R
 import io.element.android.features.call.impl.notifications.CallNotificationData
 import io.element.android.libraries.designsystem.background.OnboardingBackground
 import io.element.android.libraries.designsystem.components.avatar.Avatar
@@ -87,7 +86,9 @@ internal fun IncomingCallScreen(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = stringResource(R.string.screen_incoming_call_subtitle_android),
+                // Show the caller's chosen media type (resolved from the Wallet API) instead of the
+                // generic "Incoming call" subtitle, so the receiver knows what they're answering.
+                text = if (notificationData.isVideoCall) "Incoming video call" else "Incoming voice call",
                 style = ElementTheme.typography.fontBodyLgRegular,
                 color = ElementTheme.colors.textSecondary,
                 textAlign = TextAlign.Center,

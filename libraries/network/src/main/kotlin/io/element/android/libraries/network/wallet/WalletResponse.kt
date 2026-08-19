@@ -100,6 +100,22 @@ data class InitiateHoldRequest(
     @SerialName("consultantId") val consultantId: String,
 )
 
+/** Caller records the chosen media type for the latest call in a room ("voice" | "video"). */
+@Serializable
+data class SetCallTypeRequest(
+    @SerialName("roomId") val roomId: String,
+    @SerialName("callType") val callType: String,
+    @SerialName("callerId") val callerId: String? = null,
+)
+
+@Serializable
+data class CallTypeResponse(
+    @SerialName("roomId") val roomId: String? = null,
+    /** "voice" | "video", or null when no caller has recorded a type for this room. */
+    @SerialName("callType") val callType: String? = null,
+    @SerialName("updatedAt") val updatedAt: String? = null,
+)
+
 @Serializable
 data class HoldExistsResponse(
     @SerialName("exists") val exists: Boolean,

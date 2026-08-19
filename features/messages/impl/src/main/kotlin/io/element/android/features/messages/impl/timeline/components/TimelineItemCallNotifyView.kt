@@ -84,7 +84,10 @@ internal fun TimelineItemCallNotifyView(
             ) {
                 Icon(
                     modifier = Modifier.size(20.sp.toDp()),
-                    imageVector = CompoundIcons.VideoCallSolid(),
+                    // Neutral phone icon: the Matrix call event carries no voice/video field, so
+                    // this tile cannot know which kind the call was — the old hardcoded video
+                    // camera wrongly presented every (mostly voice) call as video.
+                    imageVector = CompoundIcons.VoiceCallSolid(),
                     contentDescription = null,
                     tint = ElementTheme.colors.iconSecondary,
                 )

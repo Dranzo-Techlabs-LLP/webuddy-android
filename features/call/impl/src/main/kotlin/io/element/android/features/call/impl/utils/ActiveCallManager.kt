@@ -33,6 +33,7 @@ import io.element.android.libraries.matrix.ui.media.ImageLoaderHolder
 import io.element.android.libraries.push.api.notifications.ForegroundServiceType
 import io.element.android.libraries.push.api.notifications.NotificationIdProvider
 import io.element.android.libraries.push.api.notifications.OnMissedCallNotificationHandler
+import io.element.android.libraries.network.wallet.WalletService
 import io.element.android.services.appnavstate.api.AppForegroundStateService
 import io.element.android.services.toolbox.api.systemclock.SystemClock
 import kotlinx.coroutines.CoroutineScope
@@ -53,8 +54,12 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 import kotlin.math.min
+
+/** Upper bound on the wallet-API call-type lookup so a slow network never delays the ring. */
+private const val CALL_TYPE_LOOKUP_TIMEOUT_MS = 2_000L
 
 /**
  * Manages the active call state.
@@ -99,6 +104,7 @@ class DefaultActiveCallManager(
     private val appForegroundStateService: AppForegroundStateService,
     private val imageLoaderHolder: ImageLoaderHolder,
     private val systemClock: SystemClock,
+    private val walletService: WalletService,
 ) : ActiveCallManager {
     private val tag = "ActiveCallManager"
     private var timedOutCallJob: Job? = null
@@ -118,42 +124,51 @@ class DefaultActiveCallManager(
     }
 
     override suspend fun registerIncomingCall(notificationData: CallNotificationData) {
+        // Resolve the caller's chosen media type (voice/video) from the Wallet API — the Matrix
+        // rtc-notification event has no media field. Bounded so a slow API can never delay the
+        // ring; unknown/timeout falls back to voice (camera stays off — the safe direction).
+        val callTypeFromApi = withTimeoutOrNull(CALL_TYPE_LOOKUP_TIMEOUT_MS) {
+            walletService.getRoomCallType(notificationData.roomId.value)
+        }
+        val enrichedData = notificationData.copy(isVideoCall = callTypeFromApi == "video")
+        Timber.tag(tag).d("Incoming call for ${enrichedData.roomId}: resolved callType=$callTypeFromApi -> isVideoCall=${enrichedData.isVideoCall}")
+
         mutex.withLock {
             val ringDuration =
                 min(
-                    notificationData.expirationTimestamp - systemClock.epochMillis(),
+                    enrichedData.expirationTimestamp - systemClock.epochMillis(),
                     ElementCallConfig.RINGING_CALL_DURATION_SECONDS * 1000L
                 )
 
             if (ringDuration < 0) {
                 // Should already have stopped ringing, ignore.
-                Timber.tag(tag).d("Received timed-out incoming ringing call for room id: ${notificationData.roomId}, cancel ringing")
+                Timber.tag(tag).d("Received timed-out incoming ringing call for room id: ${enrichedData.roomId}, cancel ringing")
                 return
             }
 
             appForegroundStateService.updateHasRingingCall(true)
-            Timber.tag(tag).d("Received incoming call for room id: ${notificationData.roomId}, ringDuration(ms): $ringDuration")
+            Timber.tag(tag).d("Received incoming call for room id: ${enrichedData.roomId}, ringDuration(ms): $ringDuration")
             if (activeCall.value != null) {
-                displayMissedCallNotification(notificationData)
-                Timber.tag(tag).w("Already have an active call, ignoring incoming call: $notificationData")
+                displayMissedCallNotification(enrichedData)
+                Timber.tag(tag).w("Already have an active call, ignoring incoming call: $enrichedData")
                 return
             }
             // NOTE: keep this ringing CallType at the default (camera on) so it stays EQUAL to the
             // callType that DeclineCallBroadcastReceiver / onCancel build for hungUpCall (CallType
-            // is a data class; equality includes startWithVideoMuted). Camera-off for the receiver
-            // is applied on the ANSWER paths instead (IncomingCallActivity.onAnswer and the
-            // notification answerIntent), which is what actually starts the call.
+            // is a data class; equality includes startWithVideoMuted). The media type used at
+            // ANSWER time comes from enrichedData.isVideoCall (IncomingCallActivity.onAnswer and
+            // the notification answerIntent), which is what actually starts the call.
             activeCall.value = ActiveCall(
                 callType = CallType.RoomCall(
-                    sessionId = notificationData.sessionId,
-                    roomId = notificationData.roomId,
+                    sessionId = enrichedData.sessionId,
+                    roomId = enrichedData.roomId,
                 ),
-                callState = CallState.Ringing(notificationData),
+                callState = CallState.Ringing(enrichedData),
             )
 
             timedOutCallJob = coroutineScope.launch {
-                setUpCoil(notificationData.sessionId)
-                showIncomingCallNotification(notificationData)
+                setUpCoil(enrichedData.sessionId)
+                showIncomingCallNotification(enrichedData)
 
                 // Wait for the ringing call to time out
                 delay(timeMillis = ringDuration)
@@ -255,6 +270,7 @@ class DefaultActiveCallManager(
             timestamp = notificationData.timestamp,
             textContent = notificationData.textContent,
             expirationTimestamp = notificationData.expirationTimestamp,
+            isVideoCall = notificationData.isVideoCall,
         ) ?: return
         runCatchingExceptions {
             notificationManagerCompat.notify(

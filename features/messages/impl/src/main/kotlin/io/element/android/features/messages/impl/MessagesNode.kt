@@ -126,7 +126,12 @@ class MessagesNode(
         fun navigateToSendLocation()
         fun navigateToCreatePoll()
         fun navigateToEditPoll(eventId: EventId)
-        fun navigateToRoomCall(roomId: RoomId, startWithVideoMuted: Boolean = false)
+        /**
+         * [startWithVideoMuted] non-null = explicit voice(true)/video(false) choice from the
+         * chooser (recorded server-side so the receiver rings with the right type); null = join an
+         * existing call, matching whatever type the caller recorded.
+         */
+        fun navigateToRoomCall(roomId: RoomId, startWithVideoMuted: Boolean? = null)
         fun navigateToThread(threadRootId: ThreadId, focusedEventId: EventId?)
         fun navigateToRoomDetails()
         fun navigateToPinnedMessagesList()

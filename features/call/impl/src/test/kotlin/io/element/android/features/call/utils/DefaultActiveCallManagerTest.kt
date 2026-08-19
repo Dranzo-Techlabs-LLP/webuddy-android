@@ -476,5 +476,6 @@ class DefaultActiveCallManagerTest {
         appForegroundStateService = FakeAppForegroundStateService(),
         imageLoaderHolder = FakeImageLoaderHolder(),
         systemClock = systemClock,
+        walletService = mockk(relaxed = true),
     )
 }

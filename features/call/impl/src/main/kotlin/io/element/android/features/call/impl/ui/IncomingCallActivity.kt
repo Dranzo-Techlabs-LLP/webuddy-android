@@ -112,14 +112,14 @@ class IncomingCallActivity : AppCompatActivity() {
     }
 
     private fun onAnswer(notificationData: CallNotificationData) {
-        // Answer with the camera OFF (voice-first). This matches the ringing state built in
-        // ActiveCallManager.registerIncomingCall and, for a DM, selects Element Call's
-        // JOIN_EXISTING_DM_VOICE intent so the receiver isn't broadcasting video on pickup.
+        // Join with the camera matching the CALLER'S choice (isVideoCall resolved from the Wallet
+        // API when the ring arrived): video call -> camera on; voice call -> camera off (for a DM
+        // that selects Element Call's JOIN_EXISTING_DM_VOICE intent).
         elementCallEntryPoint.startCall(
             CallType.RoomCall(
                 sessionId = notificationData.sessionId,
                 roomId = notificationData.roomId,
-                startWithVideoMuted = true,
+                startWithVideoMuted = !notificationData.isVideoCall,
             )
         )
     }

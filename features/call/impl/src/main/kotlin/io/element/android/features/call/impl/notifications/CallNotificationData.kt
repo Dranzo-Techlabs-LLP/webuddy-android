@@ -29,4 +29,11 @@ data class CallNotificationData(
     val textContent: String?,
     // Expiration timestamp in millis since epoch
     val expirationTimestamp: Long,
+    /**
+     * Whether the caller started this as a VIDEO call. The Matrix rtc-notification event carries
+     * no media field, so this is resolved from the Wallet API's per-room call-type record when the
+     * ring arrives (see DefaultActiveCallManager.registerIncomingCall). Defaults to voice — the
+     * privacy-safe direction: the receiver's camera stays off unless the caller chose video.
+     */
+    val isVideoCall: Boolean = false,
 ) : Parcelable

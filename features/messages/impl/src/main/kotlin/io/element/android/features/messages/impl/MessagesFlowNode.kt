@@ -102,6 +102,7 @@ import kotlinx.parcelize.Parcelize
 import timber.log.Timber
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 @ContributesNode(RoomScope::class)
 @AssistedInject
@@ -281,16 +282,8 @@ class MessagesFlowNode(
                         backstack.push(NavTarget.EditPoll(Timeline.Mode.Live, eventId))
                     }
 
-                    override fun navigateToRoomCall(roomId: RoomId, startWithVideoMuted: Boolean) {
-                        val callType = CallType.RoomCall(
-                            sessionId = sessionId,
-                            roomId = roomId,
-                            startWithVideoMuted = startWithVideoMuted,
-                        )
-                        analyticsService.captureInteraction(Interaction.Name.MobileRoomCallButton)
-                        // Bills only if/when the other party answers - see chargeForCallWhenAnswered.
-                        chargeForCallWhenAnswered()
-                        elementCallEntryPoint.startCall(callType)
+                    override fun navigateToRoomCall(roomId: RoomId, startWithVideoMuted: Boolean?) {
+                        startRoomCall(roomId, startWithVideoMuted)
                     }
 
                     override fun navigateToPinnedMessagesList() {
@@ -500,16 +493,8 @@ class MessagesFlowNode(
                         backstack.push(NavTarget.EditPoll(Timeline.Mode.Thread(navTarget.threadRootId), eventId))
                     }
 
-                    override fun navigateToRoomCall(roomId: RoomId, startWithVideoMuted: Boolean) {
-                        val callType = CallType.RoomCall(
-                            sessionId = sessionId,
-                            roomId = roomId,
-                            startWithVideoMuted = startWithVideoMuted,
-                        )
-                        analyticsService.captureInteraction(Interaction.Name.MobileRoomCallButton)
-                        // Bills only if/when the other party answers - see chargeForCallWhenAnswered.
-                        chargeForCallWhenAnswered()
-                        elementCallEntryPoint.startCall(callType)
+                    override fun navigateToRoomCall(roomId: RoomId, startWithVideoMuted: Boolean?) {
+                        startRoomCall(roomId, startWithVideoMuted)
                     }
 
                     override fun navigateToThread(threadRootId: ThreadId, focusedEventId: EventId?) {
@@ -655,6 +640,49 @@ class MessagesFlowNode(
      * round-trip. A consultant calling a client is a no-op (WalletService drops
      * it when the current user is the consultant), and non-DM rooms never bill.
      */
+    /**
+     * Start (or join) the room's Element Call with the right media type.
+     *
+     * [startWithVideoMuted] non-null = an explicit Voice/Video choice from the chooser: the choice
+     * is first recorded as the room's call type on the Wallet API — the SOURCE OF TRUTH the
+     * receiving device reads to label the incoming-call notification and pick its camera default
+     * (the Matrix rtc-notification event has no media field).
+     *
+     * null = join-an-existing-call (top-bar Join / in-timeline "Call started" Join): the recorded
+     * type is fetched so answering matches what the caller chose — a voice call is joined with the
+     * camera off, a video call with it on. Unknown (no record / API down) falls back to camera on,
+     * the pre-chooser behavior. Both round-trips are bounded so the call can never hang on the API.
+     */
+    private fun startRoomCall(roomId: RoomId, startWithVideoMuted: Boolean?) {
+        analyticsService.captureInteraction(Interaction.Name.MobileRoomCallButton)
+        // Bills only if/when the other party answers - see chargeForCallWhenAnswered.
+        chargeForCallWhenAnswered()
+        lifecycleScope.launch {
+            val videoMuted = if (startWithVideoMuted != null) {
+                withTimeoutOrNull(CALL_TYPE_API_TIMEOUT) {
+                    walletService.setRoomCallType(
+                        roomId = roomId.value,
+                        isVideo = !startWithVideoMuted,
+                        callerId = sessionId.value,
+                    )
+                }
+                startWithVideoMuted
+            } else {
+                val recordedType = withTimeoutOrNull(CALL_TYPE_API_TIMEOUT) {
+                    walletService.getRoomCallType(roomId.value)
+                }
+                recordedType == "voice"
+            }
+            elementCallEntryPoint.startCall(
+                CallType.RoomCall(
+                    sessionId = sessionId,
+                    roomId = roomId,
+                    startWithVideoMuted = videoMuted,
+                )
+            )
+        }
+    }
+
     private fun chargeForCallWhenAnswered() {
         lifecycleScope.launch {
             val roomInfo = room.roomInfoFlow.value
@@ -690,6 +718,9 @@ class MessagesFlowNode(
          * enough to cover ringing, tight enough not to leak the observer for long.
          */
         private val CALL_ANSWER_BILLING_WINDOW = 2.minutes
+
+        /** Upper bound on the wallet-API call-type read/write so starting a call never hangs on it. */
+        private val CALL_TYPE_API_TIMEOUT = 2.seconds
     }
 
     @Composable

@@ -70,6 +70,22 @@ interface WalletApi {
         @Query("consultantId") consultantId: String
     ): PendingHoldStatusResponse
 
+    /**
+     * Record the caller's voice/video choice for the (upcoming) call in a room.
+     * The Matrix rtc-notification event has no media field, so this is the source
+     * of truth the receiving device reads to label the incoming call and pick the
+     * camera default.
+     */
+    @POST("v1/calls/type")
+    suspend fun setRoomCallType(
+        @Body request: SetCallTypeRequest
+    ): CallTypeResponse
+
+    @GET("v1/calls/type")
+    suspend fun getRoomCallType(
+        @Query("roomId") roomId: String
+    ): CallTypeResponse
+
     @POST("v1/refund/request")
     suspend fun requestRefund(
         @Body request: RefundRequest

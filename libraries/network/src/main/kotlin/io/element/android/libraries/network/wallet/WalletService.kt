@@ -444,6 +444,38 @@ class WalletService @Inject constructor(
     }
 
     /**
+     * Record the caller's voice/video choice for the call about to start in [roomId]. Fire-safe:
+     * a failure only means the receiver falls back to their default labeling — never block a call
+     * on this write.
+     */
+    suspend fun setRoomCallType(roomId: String, isVideo: Boolean, callerId: String? = null) {
+        try {
+            walletApi.setRoomCallType(
+                SetCallTypeRequest(
+                    roomId = roomId,
+                    callType = if (isVideo) "video" else "voice",
+                    callerId = callerId,
+                )
+            )
+        } catch (e: Exception) {
+            Timber.w(e, "Failed to record call type for room $roomId")
+        }
+    }
+
+    /**
+     * The media type of the latest call in [roomId]: "voice", "video", or null when unknown
+     * (no record — e.g. the caller runs an older app — or a network error).
+     */
+    suspend fun getRoomCallType(roomId: String): String? {
+        return try {
+            walletApi.getRoomCallType(roomId).callType
+        } catch (e: Exception) {
+            Timber.w(e, "Failed to fetch call type for room $roomId")
+            null
+        }
+    }
+
+    /**
      * Whether an active hold exists between the pair. Returns null on failure (network/parse error)
      * so callers can distinguish "confirmed no hold" (false) from "unknown" (null). Returning false
      * on error previously made an ongoing paid session look ended — surfacing a wrong "session ended"

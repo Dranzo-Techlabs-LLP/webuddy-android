@@ -69,6 +69,7 @@ class RingingCallNotificationCreator(
         timestamp: Long,
         expirationTimestamp: Long,
         textContent: String?,
+        isVideoCall: Boolean = false,
     ): Notification? {
         val matrixClient = matrixClientProvider.getOrRestore(sessionId).getOrNull() ?: return null
         val imageLoader = imageLoaderHolder.get(matrixClient)
@@ -88,11 +89,11 @@ class RingingCallNotificationCreator(
             .setImportant(true)
             .build()
 
-        // Answer with the camera OFF (voice-first) — this is the notification's Answer action and
-        // content tap, so it must match onAnswer's camera-off behavior.
+        // The Answer action (and content tap) joins with the camera matching the CALLER'S choice:
+        // video call -> camera on, voice call -> camera off.
         val answerIntent = IntentProvider.getPendingIntent(
             context,
-            CallType.RoomCall(sessionId = sessionId, roomId = roomId, startWithVideoMuted = true),
+            CallType.RoomCall(sessionId = sessionId, roomId = roomId, startWithVideoMuted = !isVideoCall),
         )
         val notificationData = CallNotificationData(
             sessionId = sessionId,
@@ -106,6 +107,7 @@ class RingingCallNotificationCreator(
             timestamp = timestamp,
             textContent = textContent,
             expirationTimestamp = expirationTimestamp,
+            isVideoCall = isVideoCall,
         )
 
         val declineIntent = PendingIntentCompat.getBroadcast(
@@ -132,18 +134,17 @@ class RingingCallNotificationCreator(
             .setSmallIcon(CommonDrawables.ic_notification)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_CALL)
-            // Clariva calls are voice-first (the caller starts with the camera off) and there is no
-            // per-call voice/video flag in the ring data, so present the incoming call as an audio
-            // call rather than hardcoding video — the ring UI then shows "voice call", and the
-            // receiver joins with the camera off (see ActiveCallManager.registerIncomingCall).
-            .setStyle(NotificationCompat.CallStyle.forIncomingCall(caller, declineIntent, answerIntent).setIsVideo(false))
+            // Present the incoming call as the type the CALLER chose (resolved from the Wallet
+            // API's per-room record — the Matrix rtc-notification event has no media field).
+            .setStyle(NotificationCompat.CallStyle.forIncomingCall(caller, declineIntent, answerIntent).setIsVideo(isVideoCall))
             .addPerson(caller)
             .setAutoCancel(true)
             .setWhen(timestamp)
             .setOngoing(true)
             .setShowWhen(false)
-            // If textContent is null, the content text is set by the style (will be "Incoming call")
-            .setContentText(textContent)
+            // Explicit, type-accurate text (the push default was an emoji'd "📹 Incoming call"
+            // regardless of the actual call type).
+            .setContentText(if (isVideoCall) "Incoming video call" else "Incoming voice call")
             .setSound(Settings.System.DEFAULT_RINGTONE_URI, AudioManager.STREAM_RING)
             .setTimeoutAfter(ElementCallConfig.RINGING_CALL_DURATION_SECONDS.seconds.inWholeMilliseconds)
             .setContentIntent(answerIntent)
