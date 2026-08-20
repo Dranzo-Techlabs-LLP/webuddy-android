@@ -35,15 +35,22 @@ import io.element.android.libraries.architecture.runCatchingUpdatingState
 import io.element.android.libraries.core.coroutine.CoroutineDispatchers
 import io.element.android.libraries.di.annotations.AppCoroutineScope
 import io.element.android.libraries.matrix.api.MatrixClientProvider
+import io.element.android.libraries.matrix.api.core.EventId
+import io.element.android.libraries.matrix.api.room.isDm
 import io.element.android.libraries.matrix.api.sync.SyncState
+import io.element.android.libraries.matrix.api.timeline.MatrixTimelineItem
+import io.element.android.libraries.matrix.api.timeline.item.event.CallNotifyContent
 import io.element.android.libraries.matrix.api.widget.MatrixWidgetDriver
+import io.element.android.services.appnavstate.api.ActiveRoomsHolder
 import io.element.android.libraries.network.useragent.UserAgentProvider
 import io.element.android.services.analytics.api.ScreenTracker
 import io.element.android.services.appnavstate.api.AppForegroundStateService
 import io.element.android.services.toolbox.api.systemclock.SystemClock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -66,6 +73,7 @@ class CallScreenPresenter(
     @AppCoroutineScope
     private val appCoroutineScope: CoroutineScope,
     private val widgetMessageSerializer: WidgetMessageSerializer,
+    private val activeRoomsHolder: ActiveRoomsHolder,
 ) : Presenter<CallScreenState> {
     @AssistedFactory
     interface Factory {
@@ -84,8 +92,30 @@ class CallScreenPresenter(
         var isWidgetLoaded by rememberSaveable { mutableStateOf(false) }
         var ignoreWebViewError by rememberSaveable { mutableStateOf(false) }
         var webViewError by remember { mutableStateOf<String?>(null) }
+        // Flipped by the caller-side decline observer below when the DM peer declines the call.
+        var peerDeclined by remember { mutableStateOf(false) }
         val languageTag = languageTagProvider.provideLanguageTag()
         val theme = if (ElementTheme.isLightTheme) "light" else "dark"
+
+        // Hang up the current call: if the widget is live, ask it to hang up first (so the RTC
+        // session is torn down cleanly) then close; otherwise just close. Shared by the manual
+        // Hangup button and the automatic decline handling.
+        fun performHangup() {
+            val widgetId = callWidgetDriver.value?.id
+            val interceptor = messageInterceptor.value
+            if (widgetId != null && interceptor != null && isWidgetLoaded) {
+                sendHangupMessage(widgetId, interceptor)
+                isWidgetLoaded = false
+                coroutineScope.launch {
+                    delay(2.seconds)
+                    close(callWidgetDriver.value, navigator)
+                }
+            } else {
+                coroutineScope.launch {
+                    close(callWidgetDriver.value, navigator)
+                }
+            }
+        }
 
         DisposableEffect(Unit) {
             coroutineScope.launch {
@@ -162,27 +192,77 @@ class CallScreenPresenter(
             }
         }
 
+        // Caller-side auto-hangup when the DM peer DECLINES. Element Call leaves the caller sitting
+        // in the RTC session ("Waiting for media…") after a decline, which also keeps the room's
+        // call "ongoing" so BOTH sides keep showing a Join button in chat. Detect the decline via
+        // the SDK and hang up — this tears down the RTC session and clears Join on both devices.
+        val roomCallType = callType as? CallType.RoomCall
+        if (roomCallType != null) {
+            LaunchedEffect(Unit) {
+                val client = matrixClientsProvider.getOrRestore(roomCallType.sessionId).getOrNull()
+                    ?: return@LaunchedEffect
+                // Reuse the already-open room when possible; only a room WE create must be destroyed.
+                val activeRoom = activeRoomsHolder.getActiveRoomMatching(roomCallType.sessionId, roomCallType.roomId)
+                val room = activeRoom ?: client.getJoinedRoom(roomCallType.roomId) ?: return@LaunchedEffect
+                val ownRoom = activeRoom == null
+                try {
+                    // Only 1:1 DM calls end on a single decline; a group call must survive it.
+                    if (!room.isDm()) return@LaunchedEffect
+                    // The caller isn't handed the ring (m.rtc.notification) event id — Element Call
+                    // emits it over the widget API — so discover it from our own live timeline. It
+                    // is CRITICAL to pick the ring THIS call authors and NOT one left over from a
+                    // previous call in the same room: an old ring can carry a stale decline and hang
+                    // up the wrong (fresh) call. Timestamp windows are unreliable here (redials
+                    // within the window; device-vs-server clock skew). Instead, snapshot the rings
+                    // already present on the FIRST emission as a baseline and then wait for the
+                    // first NEW own ring to appear — that is unambiguously the ring for the call we
+                    // just started. (A callback's receiver authors no new ring, so this correctly
+                    // never fires for them, and even a missed ring degrades to a manual hang-up
+                    // rather than hanging up the wrong call.)
+                    val baseline = HashSet<EventId>()
+                    var baselineCaptured = false
+                    val ringEventId = room.liveTimeline.timelineItems
+                        .mapNotNull { items ->
+                            val ownRings = items.asSequence()
+                                .filterIsInstance<MatrixTimelineItem.Event>()
+                                .filter { it.event.isOwn && it.event.content is CallNotifyContent }
+                                .mapNotNull { it.event.eventId }
+                                .toList()
+                            if (!baselineCaptured) {
+                                baseline.addAll(ownRings)
+                                baselineCaptured = true
+                                null
+                            } else {
+                                ownRings.firstOrNull { it !in baseline }
+                            }
+                        }
+                        .first()
+                    Timber.d("Observing declines for DM call ring $ringEventId")
+                    room.subscribeToCallDecline(ringEventId).collect { decliner ->
+                        // Ignore our own decline echoes (e.g. from another of our sessions); react
+                        // only when the OTHER DM member declines.
+                        if (decliner != client.sessionId) {
+                            Timber.d("DM call declined by $decliner; hanging up the caller")
+                            peerDeclined = true
+                        }
+                    }
+                } catch (e: Exception) {
+                    Timber.w(e, "Caller-side decline observer failed")
+                } finally {
+                    if (ownRoom) room.destroy()
+                }
+            }
+            LaunchedEffect(peerDeclined) {
+                if (peerDeclined) performHangup()
+            }
+        }
+
         fun handleEvent(event: CallScreenEvents) {
             when (event) {
                 is CallScreenEvents.Hangup -> {
-                    val widgetId = callWidgetDriver.value?.id
-                    val interceptor = messageInterceptor.value
-                    if (widgetId != null && interceptor != null && isWidgetLoaded) {
-                        // If the call was joined, we need to hang up first. Then the UI will be dismissed automatically.
-                        sendHangupMessage(widgetId, interceptor)
-                        isWidgetLoaded = false
-
-                        coroutineScope.launch {
-                            // Wait for a couple of seconds to receive the hangup message
-                            // If we don't get it in time, we close the screen anyway
-                            delay(2.seconds)
-                            close(callWidgetDriver.value, navigator)
-                        }
-                    } else {
-                        coroutineScope.launch {
-                            close(callWidgetDriver.value, navigator)
-                        }
-                    }
+                    // If the call was joined, performHangup sends the hangup first and the UI is
+                    // dismissed automatically; otherwise it closes the screen directly.
+                    performHangup()
                 }
                 is CallScreenEvents.SetupMessageChannels -> {
                     messageInterceptor.value = event.widgetMessageInterceptor

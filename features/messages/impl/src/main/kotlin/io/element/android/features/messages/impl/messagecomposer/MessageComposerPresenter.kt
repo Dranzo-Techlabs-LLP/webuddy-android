@@ -210,8 +210,22 @@ class MessageComposerPresenter(
             // the OTHER user). Skip it entirely.
             if (isCurrentUserConsultant != true) {
                 otherUserId?.let { target ->
+                    // Seed the gate from the last-known values FIRST (synchronous cache reads) so a
+                    // re-opened chat shows its "Chat restricted" banner instantly instead of only
+                    // after checkHoldExists returns. The chat list already cached the recipient's
+                    // rate, and the balance is app-scoped, so on any previously-seen chat all three
+                    // gate inputs are known at first paint. The network reads below then revalidate.
+                    holdExistsState.value = walletService.getCachedHoldExists(myUserId, target)
+                    if (recipientMaxCreditsState.value == null) {
+                        recipientMaxCreditsState.value = walletService.getCachedMaxCredits(target)
+                    }
                     launch {
                         try {
+                            // Assign directly — do NOT keep the seeded value on a null/error result.
+                            // A stale cached "false" must never SURVIVE a failed re-check and leave a
+                            // client with an active paid hold wrongly restricted. On error this clears
+                            // to null, which the gate treats as "don't restrict" (the safe direction);
+                            // the common successful re-check confirms the instant seeded value.
                             holdExistsState.value = walletService.checkHoldExists(myUserId, target)
                         } catch (e: Exception) {
                             Timber.e(e, "Failed to fetch hold state")
@@ -219,7 +233,7 @@ class MessageComposerPresenter(
                     }
                     launch {
                         try {
-                            recipientMaxCreditsState.value = walletService.getMaxCredits(target)
+                            walletService.getMaxCredits(target)?.let { recipientMaxCreditsState.value = it }
                         } catch (e: Exception) {
                             Timber.e(e, "Failed to fetch recipient rate")
                         }
@@ -244,6 +258,8 @@ class MessageComposerPresenter(
                     launch { walletService.refreshBalance(myUserId) }
                     launch {
                         try {
+                            // Direct assign (same rationale as the initial load): never let a failed
+                            // re-check preserve a stale restriction on a paid client.
                             holdExistsState.value = walletService.checkHoldExists(myUserId, target)
                         } catch (e: Exception) {
                             Timber.e(e, "Failed to refresh hold state in loop")
@@ -251,7 +267,7 @@ class MessageComposerPresenter(
                     }
                     launch {
                         try {
-                            recipientMaxCreditsState.value = walletService.getMaxCredits(target)
+                            walletService.getMaxCredits(target)?.let { recipientMaxCreditsState.value = it }
                         } catch (e: Exception) {
                             Timber.e(e, "Failed to refresh recipient rate in loop")
                         }

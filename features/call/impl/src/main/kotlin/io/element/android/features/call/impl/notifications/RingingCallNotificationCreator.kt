@@ -138,7 +138,12 @@ class RingingCallNotificationCreator(
             // API's per-room record — the Matrix rtc-notification event has no media field).
             .setStyle(NotificationCompat.CallStyle.forIncomingCall(caller, declineIntent, answerIntent).setIsVideo(isVideoCall))
             .addPerson(caller)
-            .setAutoCancel(true)
+            // Do NOT auto-cancel on tap. The content tap now opens the Answer/Decline screen (a
+            // decision, not a terminal action), so auto-cancelling would remove the ringing
+            // notification (and its ringtone/actions) while the call is still merely ringing — if
+            // the user backs out without choosing, there'd be no way to answer. The notification is
+            // always removed programmatically on answer/decline/timeout (cancelIncomingCallNotification).
+            .setAutoCancel(false)
             .setWhen(timestamp)
             .setOngoing(true)
             .setShowWhen(false)
@@ -147,7 +152,13 @@ class RingingCallNotificationCreator(
             .setContentText(if (isVideoCall) "Incoming video call" else "Incoming voice call")
             .setSound(Settings.System.DEFAULT_RINGTONE_URI, AudioManager.STREAM_RING)
             .setTimeoutAfter(ElementCallConfig.RINGING_CALL_DURATION_SECONDS.seconds.inWholeMilliseconds)
-            .setContentIntent(answerIntent)
+            // Tapping the notification body must NOT answer the call. It opens the full-screen
+            // incoming-call activity (the same target as the full-screen intent) so the user still
+            // sees the Answer/Decline screen and chooses — previously this was answerIntent, which
+            // silently joined the call the instant the user touched the notification. If the OS
+            // grants the full-screen intent this activity is already showing; if not, the tap
+            // brings it up ("take me to the app"). Only the explicit Answer action joins the call.
+            .setContentIntent(fullScreenIntent ?: answerIntent)
             .setDeleteIntent(declineIntent)
             .setFullScreenIntent(fullScreenIntent, true)
             .build()

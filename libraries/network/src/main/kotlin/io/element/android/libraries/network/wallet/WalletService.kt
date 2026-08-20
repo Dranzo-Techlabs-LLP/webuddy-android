@@ -63,6 +63,15 @@ class WalletService @Inject constructor(
     private val isConsultantCache = ConcurrentHashMap<String, Boolean>()
     private val orderToTransactionMap = ConcurrentHashMap<String, String>()
 
+    // Last-known hold-exists result per client|consultant pair. Lets the chat gate render the
+    // "Chat restricted" banner INSTANTLY on re-opening a chat instead of waiting a full network
+    // round-trip for checkHoldExists (the one uncached input of the gate — balance is app-scoped
+    // and the recipient's rate is already in creditsCache from the chat list). Always revalidated
+    // in the background on chat open, so a stale hint self-corrects within one round-trip.
+    private val holdExistsCache = ConcurrentHashMap<String, Boolean>()
+
+    private fun holdKey(clientId: String, consultantId: String) = "$clientId|$consultantId"
+
     // Tracks the last user whose wallet was refreshed, so we can flush stale in-memory state
     // when the active session changes (logout + login, switch account, etc). Without this,
     // WalletService is @SingleIn(AppScope) and would leak the previous user's credits/role
@@ -159,6 +168,7 @@ class WalletService @Inject constructor(
             creditsCache.clear()
             isConsultantCache.clear()
             orderToTransactionMap.clear()
+            holdExistsCache.clear()
         }
         lastRefreshedUserId = userId
 
@@ -436,9 +446,16 @@ class WalletService @Inject constructor(
             )
             walletApi.initiateHold(request)
             Timber.d("Hold initiated successfully between $clientId and $consultantId")
+            // A hold now covers this pair; keep the gate cache in step so a follow-up chat open
+            // doesn't briefly restrict from a stale "no hold" hint before revalidation.
+            holdExistsCache[holdKey(clientId, consultantId)] = true
             Result.success(Unit)
         } catch (e: Exception) {
             Timber.e(e, "Failed to initiate hold between $clientId and $consultantId")
+            // The server MAY have committed the hold before the response was lost. Invalidate any
+            // cached "false" so the composer can't seed a stale no-hold hint and wrongly restrict a
+            // client who is actually now in a paid session; the next checkHoldExists is authoritative.
+            holdExistsCache.remove(holdKey(clientId, consultantId))
             Result.failure(e)
         }
     }
@@ -490,12 +507,29 @@ class WalletService @Inject constructor(
                 clientId = clientData?.webuddyName ?: clientId,
                 consultantId = consultantData?.webuddyName ?: consultantId
             )
+            // Remember the result so the next open of this chat can gate instantly (see holdExistsCache).
+            holdExistsCache[holdKey(clientId, consultantId)] = response.exists
             response.exists
         } catch (e: Exception) {
             Timber.e(e, "Failed to check hold existence between $clientId and $consultantId")
             null
         }
     }
+
+    /**
+     * Last-known hold-exists result for the pair, or null if never checked this session. Synchronous
+     * (plain map read) so the chat gate can seed itself instantly on open, before the background
+     * revalidation completes. Never a substitute for [checkHoldExists] — only a first-paint hint.
+     */
+    fun getCachedHoldExists(clientId: String, consultantId: String): Boolean? =
+        holdExistsCache[holdKey(clientId, consultantId)]
+
+    /**
+     * Last-known chat rate (max_credits) for [userId], or null if not cached. Synchronous; the chat
+     * list populates this for every visible room, so the composer can seed the recipient's rate
+     * without waiting for a network round-trip on chat open.
+     */
+    fun getCachedMaxCredits(userId: String): Int? = creditsCache[userId]
     suspend fun getPendingHoldStatus(clientId: String, consultantId: String): PendingHoldStatusResponse {
         val clientData = sessionStore.getSession(clientId)
         val consultantData = sessionStore.getSession(consultantId)
