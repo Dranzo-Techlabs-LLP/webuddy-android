@@ -30,11 +30,14 @@ import androidx.compose.ui.unit.dp
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.tokens.generated.CompoundIcons
 import io.element.android.features.startchat.api.ConfirmingStartDmWithMatrixUser
+import io.element.android.features.startchat.api.ConsultantChatNotAllowedException
 import io.element.android.features.startchat.impl.R
 import io.element.android.features.startchat.impl.components.UserListView
+import io.element.android.libraries.architecture.AsyncAction
 import io.element.android.libraries.designsystem.components.async.AsyncActionView
 import io.element.android.libraries.designsystem.components.async.AsyncActionViewDefaults
 import io.element.android.libraries.designsystem.components.button.BackButton
+import io.element.android.libraries.designsystem.components.dialogs.ErrorDialogDefaults
 import io.element.android.libraries.designsystem.icons.CompoundDrawables
 import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.preview.PreviewsDayNight
@@ -102,6 +105,8 @@ fun StartChatView(
         }
     }
 
+    // A consultant <-> consultant DM is refused by policy: show the warning without a retry button.
+    val isConsultantChatBlocked = (state.startDmAction as? AsyncAction.Failure)?.error is ConsultantChatNotAllowedException
     AsyncActionView(
         async = state.startDmAction,
         progressDialog = {
@@ -110,12 +115,25 @@ fun StartChatView(
             )
         },
         onSuccess = { onOpenDM(it) },
-        errorMessage = { stringResource(R.string.screen_start_chat_error_starting_chat) },
-        onRetry = {
-            state.userListState.selectedUsers.firstOrNull()
-                ?.let { state.eventSink(StartChatEvents.StartDM(it)) }
-            // Cancel start DM if there is no more selected user (should not happen)
-                ?: state.eventSink(StartChatEvents.CancelStartDM)
+        errorTitle = {
+            if (it is ConsultantChatNotAllowedException) ConsultantChatNotAllowedException.TITLE else ErrorDialogDefaults.title
+        },
+        errorMessage = {
+            if (it is ConsultantChatNotAllowedException) {
+                ConsultantChatNotAllowedException.MESSAGE
+            } else {
+                stringResource(R.string.screen_start_chat_error_starting_chat)
+            }
+        },
+        onRetry = if (isConsultantChatBlocked) {
+            null
+        } else {
+            {
+                state.userListState.selectedUsers.firstOrNull()
+                    ?.let { state.eventSink(StartChatEvents.StartDM(it)) }
+                // Cancel start DM if there is no more selected user (should not happen)
+                    ?: state.eventSink(StartChatEvents.CancelStartDM)
+            }
         },
         onErrorDismiss = { state.eventSink(StartChatEvents.CancelStartDM) },
         confirmationDialog = { data ->
@@ -161,12 +179,14 @@ private fun CreateRoomActionButtonsList(
     onDmClick: (RoomId) -> Unit,
 ) {
     LazyColumn {
-        item {
-            CreateRoomActionButton(
-                iconRes = CompoundDrawables.ic_compound_plus,
-                text = stringResource(id = R.string.screen_create_room_action_create_room),
-                onClick = onNewRoomClick,
-            )
+        if (state.areGroupRoomsEnabled) {
+            item {
+                CreateRoomActionButton(
+                    iconRes = CompoundDrawables.ic_compound_plus,
+                    text = stringResource(id = R.string.screen_create_room_action_create_room),
+                    onClick = onNewRoomClick,
+                )
+            }
         }
         item {
             CreateRoomActionButton(
@@ -191,12 +211,14 @@ private fun CreateRoomActionButtonsList(
                 onClick = onInvitePeopleClick,
             )
         }
-        item {
-            CreateRoomActionButton(
-                iconRes = CompoundDrawables.ic_compound_room,
-                text = stringResource(R.string.screen_start_chat_join_room_by_address_action),
-                onClick = onJoinByAddressClick,
-            )
+        if (state.areGroupRoomsEnabled) {
+            item {
+                CreateRoomActionButton(
+                    iconRes = CompoundDrawables.ic_compound_room,
+                    text = stringResource(R.string.screen_start_chat_join_room_by_address_action),
+                    onClick = onJoinByAddressClick,
+                )
+            }
         }
         if (state.userListState.recentDirectRooms.isNotEmpty()) {
             item {

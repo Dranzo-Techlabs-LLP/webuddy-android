@@ -119,17 +119,30 @@ private fun RestrictedComposerView(
             )
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Chat restricted. Please recharge your wallet to continue.",
-                    style = ElementTheme.typography.fontBodyMdMedium,
-                    color = ElementTheme.colors.textPrimary,
-                )
-                if (state.credits != null && state.maxCredits != null) {
+                if (state.isConsultantPeerBlocked) {
                     Text(
-                        text = "Current: ${state.credits} | Required: ${state.maxCredits}",
+                        text = "You can't chat with other consultants.",
+                        style = ElementTheme.typography.fontBodyMdMedium,
+                        color = ElementTheme.colors.textPrimary,
+                    )
+                    Text(
+                        text = "Consultants can only chat with clients.",
                         style = ElementTheme.typography.fontBodySmRegular,
                         color = ElementTheme.colors.textSecondary,
                     )
+                } else {
+                    Text(
+                        text = "Chat restricted. Please recharge your wallet to continue.",
+                        style = ElementTheme.typography.fontBodyMdMedium,
+                        color = ElementTheme.colors.textPrimary,
+                    )
+                    if (state.credits != null && state.maxCredits != null) {
+                        Text(
+                            text = "Current: ${state.credits} | Required: ${state.maxCredits}",
+                            style = ElementTheme.typography.fontBodySmRegular,
+                            color = ElementTheme.colors.textSecondary,
+                        )
+                    }
                 }
             }
         }

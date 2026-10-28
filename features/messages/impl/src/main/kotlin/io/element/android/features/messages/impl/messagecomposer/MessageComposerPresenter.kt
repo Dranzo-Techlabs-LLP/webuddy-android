@@ -142,6 +142,8 @@ class MessageComposerPresenter(
     private val suggestionSearchTrigger = MutableStateFlow<Suggestion?>(null)
     private val recipientMaxCreditsState = MutableStateFlow<Int?>(null)
     private val holdExistsState = MutableStateFlow<Boolean?>(null)
+    // Role of the DM partner, only looked up when the current user is a consultant.
+    private val peerIsConsultantState = MutableStateFlow<Boolean?>(null)
 
     // Used to disable some UI related elements in tests
     @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
@@ -158,6 +160,7 @@ class MessageComposerPresenter(
         val credits by walletService.credits.collectAsState()
         val recipientMaxCredits by recipientMaxCreditsState.collectAsState()
         val holdExists by holdExistsState.collectAsState()
+        val peerIsConsultant by peerIsConsultantState.collectAsState()
         val isCurrentUserConsultant by walletService.isCurrentUserConsultant.collectAsState()
         val dismissedNewSessionWarningConsultants by remember {
             sessionPreferencesStore.dismissedNewSessionWarningConsultants()
@@ -179,8 +182,13 @@ class MessageComposerPresenter(
         // let a null/errored hold-check keep the chat AND the call button open indefinitely for a
         // client who genuinely can't afford the consultant. So gate on balance+rate directly and
         // keep only the holdExists==true exemption (an active hold covers chat and call).
+        //
+        // Consultants may only chat with clients. Both roles must be CONFIRMED to block: an
+        // unknown role fails open, like the wallet gate below.
+        val isConsultantPeerBlocked = otherUserId != null && isCurrentUserConsultant == true && peerIsConsultant == true
         val isRestricted = when {
             otherUserId == null -> false
+            isConsultantPeerBlocked -> true                    // consultant <-> consultant
             isCurrentUserConsultant == true -> false           // confirmed consultant
             isCurrentUserConsultant == null -> false           // unknown role — don't gate, wait
             holdExists == true -> false                         // active hold covers chat AND call
@@ -196,6 +204,20 @@ class MessageComposerPresenter(
                 // Confirmed NO hold: restrict once both balance and rate are known and short.
                 balance != null && rate != null && balance < rate
             }
+        }
+
+        LaunchedEffect(otherUserId, isCurrentUserConsultant) {
+            // Only a consultant can be blocked by the consultant <-> consultant rule, so clients skip
+            // the lookup. Seed from the cache first (the chat list usually looked the partner up
+            // already) so a re-opened chat shows the banner at first paint; look the role up only
+            // when it isn't cached (a role practically never changes).
+            val target = otherUserId
+            if (isCurrentUserConsultant != true || target == null) {
+                peerIsConsultantState.value = null
+                return@LaunchedEffect
+            }
+            peerIsConsultantState.value = walletService.getCachedIsConsultant(target)
+            walletService.isUserConsultant(target)?.let { peerIsConsultantState.value = it }
         }
 
         LaunchedEffect(otherUserId, isCurrentUserConsultant) {
@@ -581,6 +603,7 @@ class MessageComposerPresenter(
             maxCredits = recipientMaxCredits,
             showNewSessionWarning = showNewSessionWarning,
             eventSink = ::handleEvent,
+            isConsultantPeerBlocked = isConsultantPeerBlocked,
         )
     }
 

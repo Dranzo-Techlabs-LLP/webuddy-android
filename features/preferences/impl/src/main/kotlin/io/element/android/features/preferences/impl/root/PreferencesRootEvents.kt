@@ -13,4 +13,8 @@ import io.element.android.libraries.matrix.api.core.SessionId
 sealed interface PreferencesRootEvents {
     data object OnVersionInfoClick : PreferencesRootEvents
     data class SwitchToSession(val sessionId: SessionId) : PreferencesRootEvents
+
+    /** Consultant only: save the designation shown under their name; blank restores the default. */
+    data class SaveDesignation(val designation: String) : PreferencesRootEvents
+    data object ClearDesignationSaveAction : PreferencesRootEvents
 }

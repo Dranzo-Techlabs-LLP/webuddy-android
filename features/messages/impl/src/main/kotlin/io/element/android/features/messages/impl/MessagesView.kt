@@ -267,6 +267,8 @@ fun MessagesView(
                                 onRefundClick = { state.eventSink(MessagesEvents.RequestRefund) },
                                 onApproveRefundClick = { state.eventSink(MessagesEvents.ApproveRefund()) },
                                 onRejectRefundClick = { state.eventSink(MessagesEvents.RejectRefund) },
+                                peerBadge = state.dmPeerStatus.badge,
+                                peerPresence = state.dmPeerStatus.presence,
                             )
                             // Banner explaining the in-flight refund request to the consultant.
                             if (state.isConsultantInThisRoom && state.refundStatus == "requested") {

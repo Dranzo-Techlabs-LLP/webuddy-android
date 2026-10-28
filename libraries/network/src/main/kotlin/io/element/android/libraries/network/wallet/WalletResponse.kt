@@ -7,11 +7,14 @@
 
 package io.element.android.libraries.network.wallet
 
+import io.element.android.libraries.network.presence.PresencePrivacy
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 
 @Serializable
@@ -20,7 +23,25 @@ data class WalletResponse(
     @SerialName("max_credits") val maxCredits: JsonElement? = null,
     @SerialName("Webuddy_name") val webuddyName: String? = null,
     @SerialName("isConsultant") val isConsultant: Int? = null,
+    // Free-form per-user JSON. Clariva keeps the consultant's designation in it under
+    // [SETTINGS_DESIGNATION_KEY], so no schema change is needed on the backend.
+    @SerialName("settings") val settings: JsonElement? = null,
 )
+
+/** Key of the consultant's designation (e.g. "Cardiologist") inside the users `settings` JSON. */
+internal const val SETTINGS_DESIGNATION_KEY = "designation"
+
+/** The designation stored in [WalletResponse.settings], or null if none / not a string. */
+internal fun WalletResponse.designation(): String? =
+    ((settings as? JsonObject)?.get(SETTINGS_DESIGNATION_KEY) as? JsonPrimitive)
+        ?.takeIf { it.isString }
+        ?.content
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+
+/** The "Last seen and online" choice stored in [WalletResponse.settings]; "Everyone" when unset. */
+internal fun WalletResponse.presencePrivacy(): PresencePrivacy =
+    PresencePrivacy.fromJson((settings as? JsonObject)?.get(PresencePrivacy.SETTINGS_KEY))
 
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
@@ -39,6 +60,8 @@ data class WalletCreateRequest(
 data class WalletUpdateRequest(
     @SerialName("max_credits") val maxCredits: Int? = null,
     @SerialName("isConsultant") val isConsultant: Int? = null,
+    // The backend REPLACES the whole settings object, so callers send the merged object.
+    @SerialName("settings") val settings: JsonObject? = null,
 )
 
 @Serializable

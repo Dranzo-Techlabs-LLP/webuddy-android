@@ -9,6 +9,7 @@
 package io.element.android.features.preferences.impl.root
 
 import io.element.android.features.logout.api.direct.DirectLogoutState
+import io.element.android.libraries.architecture.AsyncAction
 import io.element.android.libraries.designsystem.utils.snackbar.SnackbarMessage
 import io.element.android.libraries.matrix.api.core.DeviceId
 import io.element.android.libraries.matrix.api.user.MatrixUser
@@ -36,4 +37,9 @@ data class PreferencesRootState(
     val directLogoutState: DirectLogoutState,
     val snackbarMessage: SnackbarMessage?,
     val eventSink: (PreferencesRootEvents) -> Unit,
+    /** Consultant-only "Designation" entry: the title shown under their name in chats. */
+    val showDesignation: Boolean = false,
+    /** The consultant's designation, or null when none is set (the default "Consultant" shows). */
+    val designation: String? = null,
+    val designationSaveAction: AsyncAction<Unit> = AsyncAction.Uninitialized,
 )

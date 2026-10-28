@@ -22,7 +22,9 @@ import dev.zacsweers.metro.Inject
 import io.element.android.features.logout.api.direct.DirectLogoutState
 import io.element.android.features.preferences.impl.utils.ShowDeveloperSettingsProvider
 import io.element.android.features.rageshake.api.RageshakeFeatureAvailability
+import io.element.android.libraries.architecture.AsyncAction
 import io.element.android.libraries.architecture.Presenter
+import io.element.android.libraries.architecture.runCatchingUpdatingState
 import io.element.android.libraries.designsystem.utils.snackbar.SnackbarDispatcher
 import io.element.android.libraries.designsystem.utils.snackbar.collectSnackbarMessageAsState
 import io.element.android.libraries.featureflag.api.FeatureFlagService
@@ -124,6 +126,8 @@ class PreferencesRootPresenter(
         // regular clients. Null (unknown) role is treated as not-consultant so the entry stays hidden
         // until we positively confirm the consultant role.
         val isCurrentUserConsultant by walletService.isCurrentUserConsultant.collectAsState()
+        val currentUserDesignation by walletService.currentUserDesignation.collectAsState()
+        val designationSaveAction: MutableState<AsyncAction<Unit>> = remember { mutableStateOf(AsyncAction.Uninitialized) }
 
         val directLogoutState = directLogoutPresenter.present()
 
@@ -141,6 +145,12 @@ class PreferencesRootPresenter(
                 is PreferencesRootEvents.SwitchToSession -> coroutineScope.launch {
                     sessionStore.setLatestSession(event.sessionId.value)
                 }
+                is PreferencesRootEvents.SaveDesignation -> coroutineScope.launch {
+                    designationSaveAction.runCatchingUpdatingState {
+                        walletService.updateDesignation(matrixClient.sessionId.value, event.designation).getOrThrow()
+                    }
+                }
+                PreferencesRootEvents.ClearDesignationSaveAction -> designationSaveAction.value = AsyncAction.Uninitialized
             }
         }
 
@@ -170,6 +180,9 @@ class PreferencesRootPresenter(
             directLogoutState = directLogoutState,
             snackbarMessage = snackbarMessage,
             eventSink = ::handleEvent,
+            showDesignation = isCurrentUserConsultant == true,
+            designation = currentUserDesignation,
+            designationSaveAction = designationSaveAction.value,
         )
     }
 

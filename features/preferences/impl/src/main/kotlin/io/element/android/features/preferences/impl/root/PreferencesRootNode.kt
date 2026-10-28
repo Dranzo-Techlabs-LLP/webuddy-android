@@ -50,6 +50,7 @@ class PreferencesRootNode(
         fun navigateToUserProfile(matrixUser: MatrixUser)
         fun navigateToBlockedUsers()
         fun navigateToMyQrCode()
+        fun navigateToLastSeenPrivacy()
         fun startSignOutFlow()
         fun startAccountDeactivationFlow()
     }
@@ -95,6 +96,7 @@ class PreferencesRootNode(
             onOpenUserProfile = callback::navigateToUserProfile,
             onOpenBlockedUsers = callback::navigateToBlockedUsers,
             onMyQrCodeClick = callback::navigateToMyQrCode,
+            onOpenLastSeenPrivacy = callback::navigateToLastSeenPrivacy,
             onSignOutClick = {
                 if (state.directLogoutState.canDoDirectSignOut) {
                     state.directLogoutState.eventSink(DirectLogoutEvents.Logout(ignoreSdkError = false))

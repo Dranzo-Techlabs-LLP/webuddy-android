@@ -8,6 +8,7 @@
 
 package io.element.android.features.home.impl
 
+import io.element.android.appconfig.ClarivaConfig
 import io.element.android.features.home.impl.roomlist.RoomListState
 import io.element.android.features.home.impl.spaces.HomeSpacesState
 import io.element.android.features.logout.api.direct.DirectLogoutState
@@ -34,5 +35,6 @@ data class HomeState(
 ) {
     val displayActions = currentHomeNavigationBarItem == HomeNavigationBarItem.Chats
     val displayRoomListFilters = currentHomeNavigationBarItem == HomeNavigationBarItem.Chats && roomListState.displayFilters
-    val showNavigationBar = homeSpacesState.spaceRooms.isNotEmpty()
+    // The Chats / Spaces bar only exists for Spaces, which are hidden while group rooms are disabled.
+    val showNavigationBar = ClarivaConfig.GROUP_ROOMS_ENABLED && homeSpacesState.spaceRooms.isNotEmpty()
 }

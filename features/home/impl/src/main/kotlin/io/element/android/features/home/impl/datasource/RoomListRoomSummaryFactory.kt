@@ -45,6 +45,10 @@ class RoomListRoomSummaryFactory(
         // whether the local user is a client (sees what they'll pay) or a consultant (sees the
         // peer consultant's rate, which is a no-op for self-billing).
         val credits = heroUserId?.let { walletService.getRecipientChatRate(it.value) }
+        // That same lookup caches the partner's role and designation.
+        val designationBadge = heroUserId?.value
+            ?.takeIf { walletService.getCachedIsConsultant(it) == true }
+            ?.let { walletService.getCachedDesignation(it) ?: WalletService.DEFAULT_CONSULTANT_DESIGNATION }
 
         // For consultants, mark the row if the other party has an open refund request waiting.
         // The pending set is populated by HomePresenter on home mount via
@@ -93,6 +97,7 @@ class RoomListRoomSummaryFactory(
             isSpace = roomInfo.isSpace,
             heroUserId = heroUserId,
             credits = credits,
+            designationBadge = designationBadge,
             hasPendingRefundRequest = hasPendingRefundRequest,
         )
     }

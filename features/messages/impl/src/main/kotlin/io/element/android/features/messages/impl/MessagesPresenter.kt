@@ -76,6 +76,7 @@ import io.element.android.libraries.matrix.api.permalink.PermalinkParser
 import io.element.android.libraries.matrix.api.room.JoinedRoom
 import io.element.android.libraries.matrix.api.room.RoomInfo
 import io.element.android.libraries.matrix.api.room.RoomMembersState
+import io.element.android.libraries.matrix.api.room.RoomMembershipState
 import io.element.android.libraries.matrix.api.room.isDm
 import io.element.android.libraries.matrix.api.room.powerlevels.permissionsAsState
 import io.element.android.libraries.matrix.api.timeline.item.event.EventOrTransactionId
@@ -128,6 +129,7 @@ class MessagesPresenter(
     private val ollamaApi: io.element.android.libraries.network.ollama.OllamaApi,
     private val walletService: io.element.android.libraries.network.wallet.WalletService,
     @SessionCoroutineScope private val sessionCoroutineScope: CoroutineScope,
+    private val dmPeerStatusPresenter: io.element.android.features.messages.impl.topbars.DmPeerStatusPresenter,
 ) : Presenter<MessagesState> {
     @AssistedFactory
     interface Factory {
@@ -270,6 +272,13 @@ class MessagesPresenter(
         val isRefundRequestInProgress = remember { mutableStateOf(false) }
         val notifiedRefundRequestIds = remember { mutableSetOf<String>() }
         val otherUserId = dmRoomMember?.userId?.value
+        // Badge (consultant designation) and presence shown under the partner's name in a DM.
+        val dmPeerStatus = dmPeerStatusPresenter.present(
+            sessionId = room.sessionId.value,
+            peerId = otherUserId,
+            // A "contact" for last-seen privacy: both people have joined the chat.
+            isPeerJoined = dmRoomMember?.membership == RoomMembershipState.JOIN,
+        )
 
         LaunchedEffect(otherUserId) {
             val myUserId = room.sessionId.value
@@ -624,6 +633,7 @@ class MessagesPresenter(
             refundRequestId = refundRequestId.value,
             refundHeldAmount = refundHeldAmount.value,
             ongoingCallIsVideo = ongoingCallIsVideo,
+            dmPeerStatus = dmPeerStatus,
             chatTransientEvents = chatTransientEvents,
             eventSink = ::handleEvent,
         )

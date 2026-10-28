@@ -17,5 +17,7 @@ data class StartChatState(
     val userListState: UserListState,
     val startDmAction: AsyncAction<RoomId>,
     val isRoomDirectorySearchEnabled: Boolean,
+    /** Shows the group-room entries ("New room", "Join room by address"). */
+    val areGroupRoomsEnabled: Boolean,
     val eventSink: (StartChatEvents) -> Unit,
 )

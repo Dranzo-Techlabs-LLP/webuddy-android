@@ -20,6 +20,7 @@ import io.element.android.features.messages.impl.timeline.components.customreact
 import io.element.android.features.messages.impl.timeline.components.reactionsummary.ReactionSummaryState
 import io.element.android.features.messages.impl.timeline.components.receipt.bottomsheet.ReadReceiptBottomSheetState
 import io.element.android.features.messages.impl.timeline.protection.TimelineProtectionState
+import io.element.android.features.messages.impl.topbars.DmPeerStatus
 import io.element.android.features.roomcall.api.RoomCallState
 import io.element.android.features.roommembermoderation.api.RoomMemberModerationState
 import io.element.android.libraries.architecture.AsyncData
@@ -71,6 +72,8 @@ data class MessagesState(
     val refundHeldAmount: Double? = null,
     /** Whether the room's ONGOING call is a video call (drives the Join buttons' icon). */
     val ongoingCallIsVideo: Boolean = false,
+    /** Shown under the partner's name in a DM: their consultant designation and presence. */
+    val dmPeerStatus: DmPeerStatus = DmPeerStatus(),
     /**
      * Chat-local toast events (string-resource ids). Emitted by [MessagesPresenter] for refund
      * approve / reject / request-sent / request-failed feedback. The chat view shows them on its

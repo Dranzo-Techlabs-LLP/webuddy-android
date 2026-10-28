@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.seconds
 import dev.zacsweers.metro.Inject
+import io.element.android.appconfig.ClarivaConfig
 import io.element.android.features.announcement.api.Announcement
 import io.element.android.features.announcement.api.AnnouncementService
 import io.element.android.features.home.impl.roomlist.RoomListState
@@ -73,7 +74,13 @@ class HomePresenter(
         var currentHomeNavigationBarItemOrdinal by rememberSaveable { mutableIntStateOf(HomeNavigationBarItem.Chats.ordinal) }
         val currentHomeNavigationBarItem by remember {
             derivedStateOf {
-                HomeNavigationBarItem.from(currentHomeNavigationBarItemOrdinal)
+                // With group rooms disabled there is no Spaces tab, so a restored Spaces selection
+                // must not leave the user on a Spaces screen without a bar to get back.
+                if (ClarivaConfig.GROUP_ROOMS_ENABLED) {
+                    HomeNavigationBarItem.from(currentHomeNavigationBarItemOrdinal)
+                } else {
+                    HomeNavigationBarItem.Chats
+                }
             }
         }
         

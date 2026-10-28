@@ -52,6 +52,7 @@ import io.element.android.libraries.core.extensions.orEmpty
 import io.element.android.libraries.core.extensions.toSafeLength
 import io.element.android.libraries.designsystem.atomic.atoms.UnreadIndicatorAtom
 import io.element.android.libraries.designsystem.atomic.molecules.InviteButtonsRowMolecule
+import io.element.android.libraries.designsystem.components.DesignationBadge
 import io.element.android.libraries.designsystem.components.avatar.Avatar
 import io.element.android.libraries.designsystem.components.avatar.AvatarType
 import io.element.android.libraries.designsystem.modifiers.onKeyboardContextMenuAction
@@ -128,6 +129,7 @@ internal fun RoomSummaryRow(
                         timestamp = room.timestamp,
                         isHighlighted = room.isHighlighted,
                         credits = room.credits,
+                        designationBadge = room.designationBadge,
                         hasPendingRefundRequest = room.hasPendingRefundRequest,
                     )
                     MessagePreviewAndIndicatorRow(room = room)
@@ -222,6 +224,7 @@ private fun NameAndTimestampRow(
     timestamp: String?,
     isHighlighted: Boolean,
     credits: Int? = null,
+    designationBadge: String? = null,
     hasPendingRefundRequest: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -233,8 +236,9 @@ private fun NameAndTimestampRow(
             modifier = Modifier.weight(1f),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Name
+            // Name. It gives way first, so badges beside it stay readable.
             Text(
+                modifier = Modifier.weight(1f, fill = false),
                 style = ElementTheme.typography.fontBodyLgMedium,
                 text = name?.toSafeLength(ellipsize = true) ?: stringResource(id = CommonStrings.common_no_room_name),
                 fontStyle = FontStyle.Italic.takeIf { name == null },
@@ -242,6 +246,10 @@ private fun NameAndTimestampRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            if (designationBadge != null) {
+                Spacer(modifier = Modifier.width(6.dp))
+                DesignationBadge(text = designationBadge, maxWidth = 120.dp)
+            }
             if (hasPendingRefundRequest) {
                 Spacer(modifier = Modifier.width(8.dp))
                 RefundRequestedBadge()

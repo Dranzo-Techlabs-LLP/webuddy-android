@@ -16,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import dev.zacsweers.metro.Inject
+import io.element.android.appconfig.ClarivaConfig
 import io.element.android.features.startchat.api.StartDMAction
 import io.element.android.features.startchat.impl.userlist.SelectionMode
 import io.element.android.features.startchat.impl.userlist.UserListDataStore
@@ -75,7 +76,9 @@ class StartChatPresenter(
             applicationName = buildMeta.applicationName,
             userListState = userListState,
             startDmAction = startDmActionState.value,
-            isRoomDirectorySearchEnabled = isRoomDirectorySearchEnabled,
+            // The room directory is a group-room feature too, whatever its developer flag says.
+            isRoomDirectorySearchEnabled = ClarivaConfig.GROUP_ROOMS_ENABLED && isRoomDirectorySearchEnabled,
+            areGroupRoomsEnabled = ClarivaConfig.GROUP_ROOMS_ENABLED,
             eventSink = ::handleEvent,
         )
     }

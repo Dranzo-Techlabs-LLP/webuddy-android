@@ -13,7 +13,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -25,7 +28,9 @@ import io.element.android.compound.tokens.generated.CompoundIcons
 import io.element.android.features.preferences.impl.R
 import io.element.android.features.preferences.impl.user.UserPreferences
 import io.element.android.libraries.architecture.coverage.ExcludeFromCoverage
+import io.element.android.libraries.designsystem.components.async.AsyncActionView
 import io.element.android.libraries.designsystem.components.avatar.AvatarSize
+import io.element.android.libraries.designsystem.components.dialogs.TextFieldDialog
 import io.element.android.libraries.designsystem.components.list.ListItemContent
 import io.element.android.libraries.designsystem.components.preferences.PreferencePage
 import io.element.android.libraries.designsystem.preview.ElementPreview
@@ -45,6 +50,7 @@ import io.element.android.libraries.matrix.api.user.MatrixUser
 import io.element.android.libraries.matrix.ui.components.MatrixUserProvider
 import io.element.android.libraries.matrix.ui.components.MatrixUserRow
 import io.element.android.libraries.matrix.ui.components.aMatrixUserList
+import io.element.android.libraries.network.wallet.WalletService
 import io.element.android.libraries.ui.strings.CommonStrings
 
 @Composable
@@ -67,6 +73,7 @@ fun PreferencesRootView(
     onOpenUserProfile: (MatrixUser) -> Unit,
     onOpenBlockedUsers: () -> Unit,
     onMyQrCodeClick: () -> Unit,
+    onOpenLastSeenPrivacy: () -> Unit,
     onSignOutClick: () -> Unit,
     onDeactivateClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -106,6 +113,7 @@ fun PreferencesRootView(
             onManageAccountClick = onManageAccountClick,
             onLinkNewDeviceClick = onLinkNewDeviceClick,
             onMyQrCodeClick = onMyQrCodeClick,
+            onOpenLastSeenPrivacy = onOpenLastSeenPrivacy,
             onOpenBlockedUsers = onOpenBlockedUsers
         )
 
@@ -201,12 +209,18 @@ private fun ColumnScope.ManageAccountSection(
     onManageAccountClick: (url: String) -> Unit,
     onLinkNewDeviceClick: () -> Unit,
     onMyQrCodeClick: () -> Unit,
+    onOpenLastSeenPrivacy: () -> Unit,
     onOpenBlockedUsers: () -> Unit,
 ) {
     ListItem(
         headlineContent = { Text("My QR code") },
         leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.QrCode())),
         onClick = onMyQrCodeClick,
+    )
+    ListItem(
+        headlineContent = { Text("Last seen and online") },
+        leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.VisibilityOn())),
+        onClick = onOpenLastSeenPrivacy,
     )
     if (state.showLinkNewDevice) {
         ListItem(
@@ -293,6 +307,10 @@ private fun ColumnScope.GeneralSection(
         )
     }
 
+    if (state.showDesignation) {
+        DesignationItem(state)
+    }
+
     if (state.showLabsItem) {
         ListItem(
             headlineContent = { Text(stringResource(id = R.string.screen_labs_title)) },
@@ -358,6 +376,40 @@ private fun DeveloperPreferencesView(onOpenDeveloperSettings: () -> Unit) {
     )
 }
 
+/** Consultant-only: edit the designation shown under their name in chats (default "Consultant"). */
+@Composable
+private fun DesignationItem(state: PreferencesRootState) {
+    var showDialog by remember { mutableStateOf(false) }
+    ListItem(
+        headlineContent = { Text("Designation") },
+        supportingContent = { Text(state.designation ?: WalletService.DEFAULT_CONSULTANT_DESIGNATION) },
+        leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.UserProfile())),
+        onClick = { showDialog = true },
+    )
+    if (showDialog) {
+        TextFieldDialog(
+            title = "Designation",
+            content = "Shown under your name in chats. Leave it empty to show \"${WalletService.DEFAULT_CONSULTANT_DESIGNATION}\".",
+            value = state.designation,
+            placeholder = "e.g. Cardiologist",
+            validation = { it.orEmpty().trim().length <= WalletService.MAX_DESIGNATION_LENGTH },
+            onValidationErrorMessage = "Use at most ${WalletService.MAX_DESIGNATION_LENGTH} characters.",
+            submitText = "Save",
+            onSubmit = {
+                showDialog = false
+                state.eventSink(PreferencesRootEvents.SaveDesignation(it))
+            },
+            onDismissRequest = { showDialog = false },
+        )
+    }
+    AsyncActionView(
+        async = state.designationSaveAction,
+        onSuccess = { state.eventSink(PreferencesRootEvents.ClearDesignationSaveAction) },
+        errorMessage = { "Couldn't save your designation. Please try again." },
+        onErrorDismiss = { state.eventSink(PreferencesRootEvents.ClearDesignationSaveAction) },
+    )
+}
+
 @PreviewWithLargeHeight
 @Composable
 internal fun PreferencesRootViewLightPreview(@PreviewParameter(MatrixUserProvider::class) matrixUser: MatrixUser) =
@@ -390,6 +442,7 @@ private fun ContentToPreview(matrixUser: MatrixUser) {
         onOpenUserProfile = {},
         onOpenBlockedUsers = {},
         onMyQrCodeClick = {},
+        onOpenLastSeenPrivacy = {},
         onSignOutClick = {},
         onDeactivateClick = {},
     )

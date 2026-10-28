@@ -33,6 +33,7 @@ import io.element.android.features.preferences.impl.billing.BillingAndPaymentsNo
 import io.element.android.features.preferences.impl.blockedusers.BlockedUsersNode
 import io.element.android.features.preferences.impl.developer.DeveloperSettingsNode
 import io.element.android.features.preferences.impl.labs.LabsNode
+import io.element.android.features.preferences.impl.lastseen.LastSeenPrivacyNode
 import io.element.android.features.preferences.impl.myqrcode.MyQrCodeNode
 import io.element.android.features.preferences.impl.notifications.NotificationSettingsNode
 import io.element.android.features.preferences.impl.notifications.edit.EditDefaultNotificationSettingNode
@@ -127,6 +128,9 @@ class PreferencesFlowNode(
 
         @Parcelize
         data object MyQrCode : NavTarget
+
+        @Parcelize
+        data object LastSeenPrivacy : NavTarget
     }
 
     private val callback: PreferencesEntryPoint.Callback = callback()
@@ -193,6 +197,10 @@ class PreferencesFlowNode(
 
                     override fun navigateToMyQrCode() {
                         backstack.push(NavTarget.MyQrCode)
+                    }
+
+                    override fun navigateToLastSeenPrivacy() {
+                        backstack.push(NavTarget.LastSeenPrivacy)
                     }
 
                     override fun startSignOutFlow() {
@@ -342,6 +350,9 @@ class PreferencesFlowNode(
                         }
                     }
                 )
+            }
+            NavTarget.LastSeenPrivacy -> {
+                createNode<LastSeenPrivacyNode>(buildContext)
             }
             NavTarget.BlockedUsers -> {
                 createNode<BlockedUsersNode>(buildContext)

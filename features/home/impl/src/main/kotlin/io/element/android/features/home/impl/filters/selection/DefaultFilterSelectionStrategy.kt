@@ -9,17 +9,26 @@
 package io.element.android.features.home.impl.filters.selection
 
 import dev.zacsweers.metro.ContributesBinding
+import io.element.android.appconfig.ClarivaConfig
 import io.element.android.features.home.impl.filters.RoomListFilter
 import io.element.android.libraries.di.SessionScope
 import kotlinx.coroutines.flow.MutableStateFlow
 
 @ContributesBinding(SessionScope::class)
 class DefaultFilterSelectionStrategy : FilterSelectionStrategy {
+    // The "Rooms" chip only exists while group rooms are enabled. The enum entry stays, because
+    // exhaustive whens elsewhere still refer to it.
+    private val availableFilters: List<RoomListFilter> = if (ClarivaConfig.GROUP_ROOMS_ENABLED) {
+        RoomListFilter.entries
+    } else {
+        RoomListFilter.entries - RoomListFilter.Rooms
+    }
     private val selectedFilters = LinkedHashSet<RoomListFilter>()
 
     override val filterSelectionStates = MutableStateFlow(buildFilters())
 
     override fun select(filter: RoomListFilter) {
+        if (filter !in availableFilters) return
         selectedFilters.add(filter)
         filterSelectionStates.value = buildFilters()
     }
@@ -45,7 +54,7 @@ class DefaultFilterSelectionStrategy : FilterSelectionStrategy {
                 isSelected = true
             )
         }
-        val unselectedFilters = RoomListFilter.entries - selectedFilters - selectedFilters.flatMap { it.incompatibleFilters }.toSet()
+        val unselectedFilters = availableFilters - selectedFilters - selectedFilters.flatMap { it.incompatibleFilters }.toSet()
         val unselectedFilterStates = unselectedFilters.map {
             FilterSelectionState(
                 filter = it,

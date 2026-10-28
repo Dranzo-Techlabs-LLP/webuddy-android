@@ -8,6 +8,7 @@
 
 package io.element.android.features.messages.impl.topbars
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -27,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
@@ -39,6 +42,7 @@ import io.element.android.features.messages.impl.timeline.components.CallMenuIte
 import io.element.android.features.roomcall.api.RoomCallState
 import io.element.android.features.roomcall.api.aStandByCallState
 import io.element.android.features.roomcall.api.anOngoingCallState
+import io.element.android.libraries.designsystem.components.DesignationBadge
 import io.element.android.libraries.designsystem.components.avatar.Avatar
 import io.element.android.libraries.designsystem.components.avatar.AvatarData
 import io.element.android.libraries.designsystem.components.avatar.AvatarSize
@@ -83,6 +87,10 @@ internal fun MessagesViewTopBar(
     onApproveRefundClick: () -> Unit,
     onRejectRefundClick: () -> Unit,
     modifier: Modifier = Modifier,
+    // DM only: the partner's consultant designation, shown as a badge under their name.
+    peerBadge: String? = null,
+    // DM only: "online" / "last seen …", shown under their name.
+    peerPresence: String? = null,
 ) {
     TopAppBar(
         modifier = modifier,
@@ -104,6 +112,8 @@ internal fun MessagesViewTopBar(
                     roomAvatar = roomAvatar,
                     isTombstoned = isTombstoned,
                     heroes = heroes,
+                    peerBadge = peerBadge,
+                    peerPresence = peerPresence,
                     modifier = titleModifier
                 )
 
@@ -143,11 +153,16 @@ internal fun MessagesViewTopBar(
                     ElementTheme.colors.textDisabled
                 }
 
+                // Compact outlined pill: a full "Request refund" label left the DM title (name,
+                // designation badge, presence) too little room and truncated it to "…".
+                val pillShape = RoundedCornerShape(50)
                 Row(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(pillShape)
+                        .border(1.dp, ElementTheme.colors.borderInteractiveSecondary, pillShape)
                         .clickable(enabled = !isRefundRequestInProgress) { showRefundConfirm.value = true }
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                        .semantics(mergeDescendants = true) { contentDescription = "Request refund" },
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
@@ -155,13 +170,16 @@ internal fun MessagesViewTopBar(
                         imageVector = CompoundIcons.Restart(),
                         contentDescription = null,
                         tint = iconTint,
+                        modifier = Modifier.size(16.dp),
                     )
                     Text(
-                        text = "Request refund",
-                        style = ElementTheme.typography.fontBodyMdMedium,
+                        text = "Refund",
+                        style = ElementTheme.typography.fontBodySmMedium,
                         color = labelTint,
+                        maxLines = 1,
                     )
                 }
+                Spacer(Modifier.width(4.dp))
 
                 if (showRefundConfirm.value) {
                     io.element.android.libraries.designsystem.components.dialogs.ConfirmationDialog(
@@ -200,6 +218,8 @@ private fun RoomAvatarAndNameRow(
     roomAvatar: AvatarData,
     heroes: ImmutableList<AvatarData>,
     isTombstoned: Boolean,
+    peerBadge: String?,
+    peerPresence: String?,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -213,18 +233,42 @@ private fun RoomAvatarAndNameRow(
                 isTombstoned = isTombstoned,
             ),
         )
-        Text(
-            modifier = Modifier
-                .padding(horizontal = 8.dp)
-                .semantics {
-                    heading()
-                },
-            text = roomName ?: stringResource(CommonStrings.common_no_room_name),
-            style = ElementTheme.typography.fontBodyLgMedium,
-            fontStyle = FontStyle.Italic.takeIf { roomName == null },
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        // WhatsApp-style: name + designation badge on the first line, presence on its own line so
+        // it gets the full title width instead of being squeezed to "…" beside the badge.
+        Column(modifier = Modifier.padding(horizontal = 8.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    // The name gives way first; the badge keeps its (capped) width.
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .semantics {
+                            heading()
+                        },
+                    text = roomName ?: stringResource(CommonStrings.common_no_room_name),
+                    style = ElementTheme.typography.fontBodyLgMedium,
+                    fontStyle = FontStyle.Italic.takeIf { roomName == null },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (peerBadge != null) {
+                    DesignationBadge(text = peerBadge)
+                }
+            }
+            if (peerPresence != null) {
+                Text(
+                    text = peerPresence,
+                    // WhatsApp-sized subtitle: the full "last seen yesterday at 10:45 PM" fits
+                    // beside the Refund and call buttons.
+                    style = ElementTheme.typography.fontBodyXsRegular,
+                    color = if (peerPresence == "online") ElementTheme.colors.textSuccessPrimary else ElementTheme.colors.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
     }
 }
 

@@ -33,4 +33,9 @@ data class MessageComposerState(
     /** True while the "new billable session" warning dialog should be shown before sending. */
     val showNewSessionWarning: Boolean,
     val eventSink: (MessageComposerEvent) -> Unit,
+    /**
+     * True when both sides of this DM are consultants. Consultants may only chat with clients, so
+     * [isRestricted] is also true and the composer shows this reason instead of the wallet one.
+     */
+    val isConsultantPeerBlocked: Boolean = false,
 )

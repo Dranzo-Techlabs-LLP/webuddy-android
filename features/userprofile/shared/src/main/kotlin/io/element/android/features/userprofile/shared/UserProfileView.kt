@@ -23,14 +23,17 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import io.element.android.compound.tokens.generated.CompoundIcons
 import io.element.android.features.startchat.api.ConfirmingStartDmWithMatrixUser
+import io.element.android.features.startchat.api.ConsultantChatNotAllowedException
 import io.element.android.features.userprofile.api.UserProfileEvents
 import io.element.android.features.userprofile.api.UserProfileState
 import io.element.android.features.userprofile.api.UserProfileVerificationState
 import io.element.android.features.userprofile.shared.blockuser.BlockUserDialogs
 import io.element.android.features.userprofile.shared.blockuser.BlockUserSection
+import io.element.android.libraries.architecture.AsyncAction
 import io.element.android.libraries.designsystem.components.async.AsyncActionView
 import io.element.android.libraries.designsystem.components.async.AsyncActionViewDefaults
 import io.element.android.libraries.designsystem.components.button.BackButton
+import io.element.android.libraries.designsystem.components.dialogs.ErrorDialogDefaults
 import io.element.android.libraries.designsystem.components.list.ListItemContent
 import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.preview.PreviewsDayNight
@@ -98,6 +101,9 @@ fun UserProfileView(
                 BlockUserSection(state)
                 BlockUserDialogs(state)
             }
+            // A consultant <-> consultant DM is refused by policy: show the warning without a retry button.
+            val isConsultantChatBlocked =
+                (state.startDmActionState as? AsyncAction.Failure)?.error is ConsultantChatNotAllowedException
             AsyncActionView(
                 async = state.startDmActionState,
                 progressDialog = {
@@ -106,8 +112,17 @@ fun UserProfileView(
                     )
                 },
                 onSuccess = onOpenDm,
-                errorMessage = { stringResource(R.string.screen_start_chat_error_starting_chat) },
-                onRetry = { state.eventSink(UserProfileEvents.StartDM) },
+                errorTitle = {
+                    if (it is ConsultantChatNotAllowedException) ConsultantChatNotAllowedException.TITLE else ErrorDialogDefaults.title
+                },
+                errorMessage = {
+                    if (it is ConsultantChatNotAllowedException) {
+                        ConsultantChatNotAllowedException.MESSAGE
+                    } else {
+                        stringResource(R.string.screen_start_chat_error_starting_chat)
+                    }
+                },
+                onRetry = if (isConsultantChatBlocked) null else { { state.eventSink(UserProfileEvents.StartDM) } },
                 onErrorDismiss = { state.eventSink(UserProfileEvents.ClearStartDMState) },
                 confirmationDialog = { data ->
                     if (data is ConfirmingStartDmWithMatrixUser) {

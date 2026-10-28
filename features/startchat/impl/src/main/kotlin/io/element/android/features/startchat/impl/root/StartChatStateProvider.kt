@@ -65,11 +65,13 @@ fun aCreateRoomRootState(
     userListState: UserListState = aUserListState(),
     startDmAction: AsyncAction<RoomId> = AsyncAction.Uninitialized,
     isRoomDirectorySearchEnabled: Boolean = false,
+    areGroupRoomsEnabled: Boolean = true,
     eventSink: (StartChatEvents) -> Unit = {},
 ) = StartChatState(
     applicationName = applicationName,
     userListState = userListState,
     startDmAction = startDmAction,
     isRoomDirectorySearchEnabled = isRoomDirectorySearchEnabled,
+    areGroupRoomsEnabled = areGroupRoomsEnabled,
     eventSink = eventSink,
 )

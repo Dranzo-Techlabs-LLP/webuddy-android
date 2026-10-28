@@ -42,6 +42,8 @@ data class RoomListRoomSummary(
     val heroes: ImmutableList<AvatarData>,
     val isSpace: Boolean,
     val credits: Int? = null,
+    /** The DM partner's designation when they are a consultant ("Consultant" by default); null otherwise. */
+    val designationBadge: String? = null,
     val heroUserId: UserId? = null,
     /** True iff the current user is a consultant AND this room's other party has
      *  an open refund request awaiting decision. Drives the chat-list badge. */

@@ -10,13 +10,19 @@ package io.element.android.libraries.network.wallet
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import dev.zacsweers.metro.AppScope
+import io.element.android.libraries.network.presence.PresencePrivacy
 import io.element.android.libraries.sessionstorage.api.SessionStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import retrofit2.HttpException
 import timber.log.Timber
@@ -40,6 +46,15 @@ class WalletService @Inject constructor(
     private val _isCurrentUserConsultant = MutableStateFlow<Boolean?>(null)
     val isCurrentUserConsultant: StateFlow<Boolean?> = _isCurrentUserConsultant.asStateFlow()
 
+    // Current user's self-chosen designation (consultants only); null = none set, so the UI shows
+    // the default "Consultant".
+    private val _currentUserDesignation = MutableStateFlow<String?>(null)
+    val currentUserDesignation: StateFlow<String?> = _currentUserDesignation.asStateFlow()
+
+    // Current user's "Last seen and online" choice; null = not loaded yet.
+    private val _currentUserPresencePrivacy = MutableStateFlow<PresencePrivacy?>(null)
+    val currentUserPresencePrivacy: StateFlow<PresencePrivacy?> = _currentUserPresencePrivacy.asStateFlow()
+
     // Pending role selection picked on the account-creation screen, applied when the wallet user is created
     // after the Matrix.org webview returns. Default = false (Normal User). Reset to default once consumed.
     private val _pendingIsConsultant = MutableStateFlow(false)
@@ -61,6 +76,11 @@ class WalletService @Inject constructor(
     // chat-list factory to decide whether to render the "X credits" per-row rate: only a
     // consultant has a chat rate; for client-to-client rooms the row stays blank.
     private val isConsultantCache = ConcurrentHashMap<String, Boolean>()
+    // Per-user designation, filled by the same user lookups. "" = looked up, none set
+    // (ConcurrentHashMap cannot hold null).
+    private val designationCache = ConcurrentHashMap<String, String>()
+    // Per-user "Last seen and online" choice, filled by the same lookups.
+    private val presencePrivacyCache = ConcurrentHashMap<String, PresencePrivacy>()
     private val orderToTransactionMap = ConcurrentHashMap<String, String>()
 
     // Last-known hold-exists result per client|consultant pair. Lets the chat gate render the
@@ -164,9 +184,13 @@ class WalletService @Inject constructor(
             _maxCredits.value = null
             _originalMaxCredits.value = null
             _isCurrentUserConsultant.value = null
+            _currentUserDesignation.value = null
+            _currentUserPresencePrivacy.value = null
             _pendingRefundRequestClients.value = emptySet()
             creditsCache.clear()
             isConsultantCache.clear()
+            designationCache.clear()
+            presencePrivacyCache.clear()
             orderToTransactionMap.clear()
             holdExistsCache.clear()
         }
@@ -222,6 +246,13 @@ class WalletService @Inject constructor(
         }
 
         response.isConsultant?.let { _isCurrentUserConsultant.value = it == 1 }
+        // No designation in the record is a real value ("none"), so it always overwrites.
+        val designation = response.designation()
+        _currentUserDesignation.value = designation
+        designationCache[userId] = designation.orEmpty()
+        val presencePrivacy = response.presencePrivacy()
+        _currentUserPresencePrivacy.value = presencePrivacy
+        presencePrivacyCache[userId] = presencePrivacy
     }
 
     private fun seedDefaultBalanceIfEmpty() {
@@ -261,6 +292,8 @@ class WalletService @Inject constructor(
                 creditsCache[userId] = maxCreditsValue
             }
             response.isConsultant?.let { isConsultantCache[userId] = it == 1 }
+            designationCache[userId] = response.designation().orEmpty()
+            presencePrivacyCache[userId] = response.presencePrivacy()
             maxCreditsValue
         } catch (e: Exception) {
             Timber.e(e, "Failed to get max credits for user $userId. Error: ${e.message}")
@@ -277,6 +310,120 @@ class WalletService @Inject constructor(
         // Make sure both caches are populated. getMaxCredits is a cache-first lookup.
         val maxCredits = getMaxCredits(userId)
         return if (isConsultantCache[userId] == true) maxCredits else null
+    }
+
+    /** Last-known role of [userId] (true = consultant), or null if it was never looked up. */
+    fun getCachedIsConsultant(userId: String): Boolean? = isConsultantCache[userId]
+
+    /** Last-known designation of [userId], or null when none is set or it was never looked up. */
+    fun getCachedDesignation(userId: String): String? = designationCache[userId]?.takeIf { it.isNotEmpty() }
+
+    /** Last-known "Last seen and online" choice of [userId], or null if it was never looked up. */
+    fun getCachedPresencePrivacy(userId: String): PresencePrivacy? = presencePrivacyCache[userId]
+
+    /**
+     * Whether [userId] is a consultant, or null when unknown (lookup failed). Cache-first.
+     *
+     * Unlike [getMaxCredits] this performs the lookup whenever the ROLE is missing:
+     * getMaxCredits returns early on a cached rate, so a role the backend didn't send the
+     * first time would otherwise stay unknown forever.
+     */
+    suspend fun isUserConsultant(userId: String): Boolean? {
+        isConsultantCache[userId]?.let { return it }
+        lookUpUser(userId)
+        return isConsultantCache[userId]
+    }
+
+    /**
+     * Re-reads [userId]'s role, designation and presence privacy from the backend, bypassing the cache, so a
+     * designation a consultant changed shows the next time their chat is opened. Returns false
+     * when the lookup failed, in which case the previously cached values are kept.
+     */
+    suspend fun refreshPeerProfile(userId: String): Boolean = lookUpUser(userId)
+
+    /**
+     * Fetches [userId]'s wallet record and refreshes the per-user caches (rate, role,
+     * designation). It must not touch the LOCAL user's state flows (see [getMaxCredits]).
+     * A 404 means the user has no wallet record — every consultant has one — so it is
+     * recorded as "not a consultant". Returns false on any other failure.
+     */
+    private suspend fun lookUpUser(userId: String): Boolean {
+        return try {
+            val identifier = sessionStore.getSession(userId)?.webuddyName ?: userId
+            val response = walletApi.getWalletBalance(identifier)
+            response.maxCredits?.jsonPrimitive?.content?.toDoubleOrNull()?.toInt()
+                ?.let { creditsCache[userId] = it }
+            response.isConsultant?.let { isConsultantCache[userId] = it == 1 }
+            designationCache[userId] = response.designation().orEmpty()
+            presencePrivacyCache[userId] = response.presencePrivacy()
+            true
+        } catch (e: HttpException) {
+            if (e.code() == 404) {
+                isConsultantCache[userId] = false
+                designationCache[userId] = ""
+                presencePrivacyCache[userId] = PresencePrivacy()
+                true
+            } else {
+                Timber.e(e, "Failed to look up user $userId")
+                false
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to look up user $userId")
+            false
+        }
+    }
+
+    /**
+     * Saves the current user's designation (a consultant's title shown under their name, e.g.
+     * "Cardiologist"). Blank removes it, so the default "Consultant" shows again. The backend
+     * REPLACES the whole `settings` JSON, so this re-reads it first and writes it back with only
+     * the designation changed, keeping any other keys.
+     */
+    suspend fun updateDesignation(userId: String, designation: String?): Result<Unit> {
+        val value = designation?.trim()?.takeIf { it.isNotEmpty() }
+        if (value != null && value.length > MAX_DESIGNATION_LENGTH) {
+            return Result.failure(IllegalArgumentException("Designation must be at most $MAX_DESIGNATION_LENGTH characters"))
+        }
+        return updateSettings(userId, SETTINGS_DESIGNATION_KEY, value?.let { JsonPrimitive(it) }).onSuccess {
+            _currentUserDesignation.value = value
+            designationCache[userId] = value.orEmpty()
+            Timber.d("Designation updated for $userId")
+        }
+    }
+
+    /** Saves the current user's "Last seen and online" choice. */
+    suspend fun updatePresencePrivacy(userId: String, privacy: PresencePrivacy): Result<Unit> {
+        return updateSettings(userId, PresencePrivacy.SETTINGS_KEY, privacy.toJson()).onSuccess {
+            _currentUserPresencePrivacy.value = privacy
+            presencePrivacyCache[userId] = privacy
+            Timber.d("Presence privacy updated for $userId")
+        }
+    }
+
+    /**
+     * Sets one key of [userId]'s `settings` JSON ([value] null removes it). The backend REPLACES the
+     * whole object, so this re-reads it first and writes it back with only that key changed.
+     */
+    private suspend fun updateSettings(userId: String, key: String, value: JsonElement?): Result<Unit> {
+        return try {
+            val identifier = sessionStore.getSession(userId)?.webuddyName ?: userId
+            val current = walletApi.getWalletBalance(identifier).settings as? JsonObject
+            val merged = buildJsonObject {
+                current?.forEach { (existingKey, element) ->
+                    if (existingKey != key) put(existingKey, element)
+                }
+                if (value != null) put(key, value)
+            }
+            walletApi.updateWallet(identifier, WalletUpdateRequest(settings = merged))
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to update settings '$key' for $userId")
+            Result.failure(e)
+        }
     }
 
     fun setMaxCredits(maxCredits: Int) {
@@ -642,6 +789,14 @@ class WalletService @Inject constructor(
             Timber.e(e, "Failed to claim auto-approval notification for $refundRequestId; skipping send")
             false
         }
+    }
+
+    companion object {
+        /** Longest designation a consultant can set; keeps the badge under their name on one line. */
+        const val MAX_DESIGNATION_LENGTH = 40
+
+        /** Shown under a consultant's name when they haven't set a designation. */
+        const val DEFAULT_CONSULTANT_DESIGNATION = "Consultant"
     }
 }
 

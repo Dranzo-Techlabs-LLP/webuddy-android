@@ -39,4 +39,12 @@ object ClarivaConfig {
     const val GOOGLE_SERVER_CLIENT_ID = "462109274571-5qsno88m3vu5gijggbvccej3v8tt1qbe.apps.googleusercontent.com"
 
     val isGoogleSignInConfigured: Boolean get() = GOOGLE_SERVER_CLIENT_ID.isNotEmpty()
+
+    /**
+     * Group rooms (and spaces) are not part of Clariva yet. False hides the "Rooms" chat-list
+     * filter, the "New room", "Join room by address" and room directory entries, and the Spaces
+     * tab. 1:1 chats are unaffected, and group rooms a user is already in keep appearing in the
+     * chat list. Set to true to bring the room features back.
+     */
+    const val GROUP_ROOMS_ENABLED = false
 }
