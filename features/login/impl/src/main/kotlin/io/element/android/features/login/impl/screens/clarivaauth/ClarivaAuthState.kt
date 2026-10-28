@@ -28,6 +28,13 @@ data class GoogleRolePrompt(
     val name: String?,
     /** The account already exists; only the role is missing. */
     val isExisting: Boolean = false,
+    /**
+     * "Yes, consultant" was picked and the optional payout step (chat rate + bank
+     * account, as on the email sign-up form) is showing. Nothing is created yet.
+     */
+    val isAskingPayouts: Boolean = false,
+    /** "Yes" was picked before, so coming Back keeps it selected. */
+    val hasChosenConsultant: Boolean = false,
 )
 
 /** Live result of the server-side handle lookup on the sign-up form. */
@@ -89,6 +96,8 @@ data class ClarivaAuthState(
     /** Live "already registered" result for the email on the sign-up form. */
     val emailAvailability: EmailAvailability,
     val isConsultant: Boolean,
+    /** Optional chat rate + bank account; only shown, and only saved, for a consultant. */
+    val consultantSetup: ConsultantSetupForm,
     /** Shown in the welcome message, e.g. "the fastest Clariva ever". */
     val productionApplicationName: String,
     /** App version, shown at the foot of the landing page as the old welcome screen did. */
@@ -161,7 +170,10 @@ data class ClarivaAuthState(
                 name.trim().length >= MIN_NAME_LENGTH &&
                     isUsernameWellFormed &&
                     usernameAvailability != UsernameAvailability.Taken &&
-                    emailAvailability != EmailAvailability.Taken
+                    emailAvailability != EmailAvailability.Taken &&
+                    // The setup is optional, but what IS typed must be valid -
+                    // half a bank account would otherwise be silently dropped.
+                    (!isConsultant || consultantSetup.isValid)
         }
 
     companion object {

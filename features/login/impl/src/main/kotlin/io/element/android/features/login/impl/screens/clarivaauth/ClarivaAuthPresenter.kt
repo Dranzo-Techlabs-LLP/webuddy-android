@@ -7,6 +7,7 @@
 
 package io.element.android.features.login.impl.screens.clarivaauth
 
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -19,9 +20,12 @@ import androidx.compose.runtime.setValue
 import dev.zacsweers.metro.Inject
 import io.element.android.appconfig.ClarivaConfig
 import io.element.android.appconfig.OnBoardingConfig
+import io.element.android.features.login.impl.R
 import io.element.android.libraries.architecture.AsyncData
 import io.element.android.libraries.architecture.Presenter
 import io.element.android.libraries.core.meta.BuildMeta
+import io.element.android.libraries.designsystem.utils.snackbar.SnackbarDispatcher
+import io.element.android.libraries.designsystem.utils.snackbar.SnackbarMessage
 import io.element.android.libraries.di.annotations.AppCoroutineScope
 import io.element.android.libraries.matrix.api.MatrixClientProvider
 import io.element.android.libraries.matrix.api.auth.MatrixAuthenticationService
@@ -30,10 +34,13 @@ import io.element.android.libraries.matrix.api.core.SessionId
 import io.element.android.libraries.matrix.api.encryption.RecoveryException
 import io.element.android.libraries.matrix.api.encryption.RecoveryState
 import io.element.android.libraries.network.wallet.ClarivaAuthService
+import io.element.android.libraries.network.wallet.ClarivaBankDetailsRequest
+import io.element.android.libraries.network.wallet.WalletService
 import io.element.android.libraries.sessionstorage.api.SessionStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -60,6 +67,9 @@ class ClarivaAuthPresenter(
     // cancelling rememberCoroutineScope() mid-request.
     @AppCoroutineScope
     private val appCoroutineScope: CoroutineScope,
+    private val walletService: WalletService,
+    // App-wide, so a message posted here shows on the home screen after sign-up.
+    private val snackbarDispatcher: SnackbarDispatcher,
 ) : Presenter<ClarivaAuthState> {
     // Homeserver discovery (a .well-known network round-trip) is independent of the user's
     // credentials, so we pre-warm it as soon as the auth screen opens. By the time the user
@@ -90,6 +100,7 @@ class ClarivaAuthPresenter(
         var name by rememberSaveable { mutableStateOf("") }
         var username by rememberSaveable { mutableStateOf("") }
         var isConsultant by rememberSaveable { mutableStateOf(false) }
+        var consultantSetup by rememberSaveable { mutableStateOf(ConsultantSetupForm()) }
         var authAction by remember { mutableStateOf<AsyncData<Unit>>(AsyncData.Uninitialized) }
         var googleRolePrompt by remember { mutableStateOf<GoogleRolePrompt?>(null) }
         var forgotPassword by remember { mutableStateOf<ForgotPasswordState?>(null) }
@@ -155,6 +166,12 @@ class ClarivaAuthPresenter(
                 // at submit time and in the preview instead.
                 is ClarivaAuthEvents.SetUsername -> username = event.username
                 is ClarivaAuthEvents.SetIsConsultant -> isConsultant = event.isConsultant
+                // Typed values are kept even if the switch goes off, so flipping it back
+                // does not lose them; they are only ever saved for a consultant.
+                is ClarivaAuthEvents.SetConsultantSetupField ->
+                    consultantSetup = consultantSetup.with(event.field, event.value)
+                ClarivaAuthEvents.SkipConsultantSetup -> consultantSetup = ConsultantSetupForm(isSkipped = true)
+                ClarivaAuthEvents.ResumeConsultantSetup -> consultantSetup = consultantSetup.copy(isSkipped = false)
                 ClarivaAuthEvents.ToggleMode -> {
                     mode = if (mode == ClarivaAuthMode.SignUp) ClarivaAuthMode.SignIn else ClarivaAuthMode.SignUp
                     authAction = AsyncData.Uninitialized
@@ -162,6 +179,9 @@ class ClarivaAuthPresenter(
                 ClarivaAuthEvents.ClearError -> authAction = AsyncData.Uninitialized
                 ClarivaAuthEvents.Submit -> {
                     authAction = AsyncData.Loading()
+                    val setupToSave = consultantSetup.takeIf {
+                        mode == ClarivaAuthMode.SignUp && isConsultant && it.hasAnythingToSave
+                    }
                     coroutineScope.launch {
                         val result = when (mode) {
                             ClarivaAuthMode.SignUp -> clarivaAuthService.signUpWithEmail(
@@ -178,7 +198,13 @@ class ClarivaAuthPresenter(
                             )
                         }
                         authAction = result.fold(
-                            onSuccess = { importSession(it) },
+                            onSuccess = { credentials ->
+                                // Before the import: it navigates away, and the account
+                                // already exists either way, so a failure here never
+                                // blocks signing in.
+                                setupToSave?.let { saveConsultantSetup(credentials.matrixUserId, it) }
+                                importSession(credentials)
+                            },
                             onFailure = { AsyncData.Failure(it) },
                         )
                     }
@@ -203,8 +229,23 @@ class ClarivaAuthPresenter(
                         )
                     }
                 }
+                ClarivaAuthEvents.ShowGooglePayoutStep -> {
+                    googleRolePrompt = googleRolePrompt?.copy(isAskingPayouts = true, hasChosenConsultant = true)
+                    // A "Skip for now" left over from the email form must not hide the fields here.
+                    consultantSetup = consultantSetup.copy(isSkipped = false)
+                }
+                ClarivaAuthEvents.BackToGoogleRole -> {
+                    googleRolePrompt = googleRolePrompt?.copy(isAskingPayouts = false)
+                }
                 is ClarivaAuthEvents.ConfirmGoogleRole -> {
                     val prompt = googleRolePrompt ?: return@handleEvent
+                    val setupToSave = if (event.isConsultant && !event.skipPayoutSetup) {
+                        // "Continue" is disabled on an invalid setup; never drop it silently.
+                        if (!consultantSetup.isValid) return@handleEvent
+                        consultantSetup.takeIf { it.hasAnythingToSave }
+                    } else {
+                        null
+                    }
                     googleRolePrompt = null
                     authAction = AsyncData.Loading()
                     coroutineScope.launch {
@@ -223,6 +264,9 @@ class ClarivaAuthPresenter(
                             // The server already asked once; a second prompt would
                             // mean something is wrong, so treat it as an error.
                             onRoleRequired = null,
+                            beforeImport = setupToSave?.let { setup ->
+                                { credentials -> saveConsultantSetup(credentials.matrixUserId, setup) }
+                            },
                         )
                     }
                 }
@@ -324,6 +368,7 @@ class ClarivaAuthPresenter(
             usernameAvailability = usernameAvailability,
             emailAvailability = emailAvailability,
             isConsultant = isConsultant,
+            consultantSetup = consultantSetup,
             productionApplicationName = buildMeta.productionApplicationName,
             version = buildMeta.versionName,
             isAddingAccount = isAddingAccount,
@@ -333,6 +378,47 @@ class ClarivaAuthPresenter(
             authAction = authAction,
             eventSink = ::handleEvent,
         )
+    }
+
+    /**
+     * Save the optional chat rate and bank account typed on the sign-up form.
+     *
+     * Both run together and are bounded, so a slow API delays sign-in by seconds
+     * at most. Failures are not fatal: the user lands in the app and a message
+     * on the home screen says what to add later in Settings.
+     */
+    private suspend fun saveConsultantSetup(matrixUserId: String, setup: ConsultantSetupForm) = coroutineScope {
+        val rate = setup.maxCreditsValue?.let { credits ->
+            async {
+                withTimeoutOrNull(CONSULTANT_SETUP_TIMEOUT) {
+                    runCatching { walletService.updateMaxCredits(matrixUserId, credits) }.isSuccess
+                } == true
+            }
+        }
+        val bank = setup.takeIf { it.hasBankDetails }?.let {
+            async {
+                withTimeoutOrNull(CONSULTANT_SETUP_TIMEOUT) {
+                    clarivaAuthService.saveMyBankDetails(
+                        ClarivaBankDetailsRequest(
+                            accountHolderName = it.accountHolderName.trim(),
+                            bankName = it.bankName.trim(),
+                            accountNumber = it.accountNumber.trim(),
+                            ifscCode = it.normalizedIfsc,
+                            branchName = it.branchName.trim().takeIf { branch -> branch.isNotEmpty() },
+                        )
+                    ).onFailure { e -> Timber.w(e, "Bank details not saved at sign-up") }.isSuccess
+                } == true
+            }
+        }
+        val rateSaved = rate?.await() ?: true
+        val bankSaved = bank?.await() ?: true
+        val message = when {
+            !rateSaved && !bankSaved -> R.string.clariva_signup_setup_failed_both
+            !bankSaved -> R.string.clariva_signup_setup_failed_bank
+            !rateSaved -> R.string.clariva_signup_setup_failed_rate
+            else -> null
+        }
+        message?.let { snackbarDispatcher.post(SnackbarMessage(it, duration = SnackbarDuration.Long)) }
     }
 
     /**
@@ -351,12 +437,16 @@ class ClarivaAuthPresenter(
         idToken: String,
         isSignUp: Boolean,
         onRoleRequired: ((GoogleRolePrompt) -> Unit)?,
+        // Runs once the account exists, before the import navigates away.
+        beforeImport: (suspend (ClarivaAuthService.Credentials) -> Unit)? = null,
     ): AsyncData<Unit> {
         return result.fold(
             onSuccess = { outcome ->
                 when (outcome) {
-                    is ClarivaAuthService.GoogleAuthOutcome.SignedIn ->
+                    is ClarivaAuthService.GoogleAuthOutcome.SignedIn -> {
+                        beforeImport?.invoke(outcome.credentials)
                         importSession(outcome.credentials)
+                    }
                     is ClarivaAuthService.GoogleAuthOutcome.RoleRequired -> {
                         if (onRoleRequired == null) {
                             AsyncData.Failure(Exception("Could not complete Google sign-up. Please try again."))
@@ -548,5 +638,8 @@ class ClarivaAuthPresenter(
          * than hanging it - history access is retried on the next sign-in.
          */
         const val RECOVERY_STATE_TIMEOUT = 20_000L
+
+        /** Per call; the chat rate and bank account are saved in parallel. */
+        const val CONSULTANT_SETUP_TIMEOUT = 10_000L
     }
 }

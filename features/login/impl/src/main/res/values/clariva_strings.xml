@@ -38,6 +38,32 @@
     <string name="clariva_auth_consultant_title">I am a consultant</string>
     <string name="clariva_auth_consultant_subtitle">Consultants are paid for chats.</string>
 
+    <!-- Optional consultant setup, revealed on sign-up by the consultant switch. -->
+    <string name="clariva_signup_setup_title">Set up payouts</string>
+    <string name="clariva_signup_setup_optional">Optional</string>
+    <string name="clariva_signup_setup_subtitle">Add your chat rate and the bank account you\'re paid into. You can skip this and do it later in Settings.</string>
+    <string name="clariva_signup_max_credits_label">Max credits per chat</string>
+    <string name="clariva_signup_max_credits_placeholder">e.g. 50</string>
+    <string name="clariva_signup_max_credits_help">What a client pays to chat with you. Leave empty to set it later.</string>
+    <string name="clariva_signup_max_credits_suffix">credits</string>
+    <string name="clariva_signup_bank_title">Bank details</string>
+    <string name="clariva_signup_bank_help">Used only to send you your earnings.</string>
+    <string name="clariva_signup_bank_incomplete">Fill in all the bank fields (branch is optional), or leave them all empty.</string>
+    <string name="clariva_signup_account_holder_label">Account holder name</string>
+    <string name="clariva_signup_bank_name_label">Bank name</string>
+    <string name="clariva_signup_bank_name_placeholder">e.g. State Bank of India</string>
+    <string name="clariva_signup_account_number_label">Account number</string>
+    <string name="clariva_signup_ifsc_label">IFSC code</string>
+    <string name="clariva_signup_ifsc_placeholder">e.g. SBIN0001234</string>
+    <string name="clariva_signup_branch_label">Branch name (optional)</string>
+    <string name="clariva_signup_setup_skip">Skip for now</string>
+    <string name="clariva_signup_setup_skipped">Payout setup skipped. You can add your chat rate and bank details later in Settings › Billing and payments.</string>
+    <string name="clariva_signup_setup_resume">Add now</string>
+    <!-- Snackbar on the home screen when the account was made but the optional setup was not saved. -->
+    <string name="clariva_signup_setup_failed_rate">Account created, but your chat rate wasn\'t saved. Set it in Settings › Billing and payments.</string>
+    <string name="clariva_signup_setup_failed_bank">Account created, but your bank details weren\'t saved. Please add them again later.</string>
+    <string name="clariva_signup_setup_failed_both">Account created, but your chat rate and bank details weren\'t saved. Please add them again later.</string>
+
     <string name="clariva_auth_have_account">Already have an account? Sign in</string>
     <string name="clariva_auth_no_account">New to Clariva? Create an account</string>
 
@@ -54,6 +80,9 @@
     <string name="clariva_google_role_yes">Yes</string>
     <string name="clariva_google_role_yes_hint">Get paid for the chats you take.</string>
     <string name="clariva_google_role_confirm">Continue</string>
+    <!-- Google sign-up, consultant: the optional payout step after the role question. -->
+    <string name="clariva_google_payout_subtitle_with_email">Signing up %1$s as a consultant. Add your chat rate and the bank account you\'re paid into, or skip and do it later in Settings.</string>
+    <string name="clariva_google_payout_back">Back</string>
 
     <string name="clariva_auth_error_email_exists">An account with this email already exists. Please sign in instead.</string>
 

@@ -72,6 +72,13 @@ interface ClarivaAuthApi {
      */
     @POST("v1/auth/matrix-session")
     suspend fun matrixSession(@Header("Authorization") bearer: String): ClarivaMatrixSessionResponse
+
+    /** Save the caller's payout bank account. Whose it is comes from the token, not the body. */
+    @POST("v1/experts/me/bank-details")
+    suspend fun saveMyBankDetails(
+        @Header("Authorization") bearer: String,
+        @Body request: ClarivaBankDetailsRequest,
+    ): ClarivaBankDetailsSaved
 }
 
 @OptIn(ExperimentalSerializationApi::class)
@@ -200,4 +207,21 @@ data class ClarivaMatrixSessionResponse(
     // verify it, which is what makes message history follow them. Null on an
     // older API, in which case the device simply has no history access.
     @SerialName("recoveryPassphrase") val recoveryPassphrase: String? = null,
+)
+
+@Serializable
+data class ClarivaBankDetailsRequest(
+    @SerialName("accountHolderName") val accountHolderName: String,
+    @SerialName("bankName") val bankName: String,
+    @SerialName("accountNumber") val accountNumber: String,
+    @SerialName("ifscCode") val ifscCode: String,
+    // Optional on the API; omitted rather than sent blank.
+    @SerialName("branchName") val branchName: String? = null,
+)
+
+/** The API echoes only the last 4 digits back; the full number is never returned. */
+@Serializable
+data class ClarivaBankDetailsSaved(
+    @SerialName("id") val id: String? = null,
+    @SerialName("accountNumberLast4") val accountNumberLast4: String? = null,
 )

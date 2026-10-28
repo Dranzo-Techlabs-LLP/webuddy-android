@@ -58,6 +58,30 @@ open class ClarivaAuthStateProvider : PreviewParameterProvider<ClarivaAuthState>
                 name = "Jane Doe",
                 username = "-nope!",
             ),
+            // Consultant: the optional setup opens below the switch.
+            aClarivaAuthState(
+                mode = ClarivaAuthMode.SignUp,
+                email = "jane@example.com",
+                password = "a-good-password",
+                name = "Jane Doe",
+                username = "jane",
+                isConsultant = true,
+                consultantSetup = ConsultantSetupForm(
+                    maxCredits = "50",
+                    accountHolderName = "Jane Doe",
+                    ifscCode = "sbin01",
+                ),
+            ),
+            // Consultant who chose "Skip for now".
+            aClarivaAuthState(
+                mode = ClarivaAuthMode.SignUp,
+                email = "jane@example.com",
+                password = "a-good-password",
+                name = "Jane Doe",
+                username = "jane",
+                isConsultant = true,
+                consultantSetup = ConsultantSetupForm(isSkipped = true),
+            ),
             aClarivaAuthState(
                 email = "jane@example.com",
                 password = "a-good-password",
@@ -75,6 +99,7 @@ fun aClarivaAuthState(
     usernameAvailability: UsernameAvailability = UsernameAvailability.Unknown,
     emailAvailability: EmailAvailability = EmailAvailability.Unknown,
     isConsultant: Boolean = false,
+    consultantSetup: ConsultantSetupForm = ConsultantSetupForm(),
     productionApplicationName: String = "Clariva",
     version: String = "26.01.3",
     isAddingAccount: Boolean = false,
@@ -91,6 +116,7 @@ fun aClarivaAuthState(
     usernameAvailability = usernameAvailability,
     emailAvailability = emailAvailability,
     isConsultant = isConsultant,
+    consultantSetup = consultantSetup,
     productionApplicationName = productionApplicationName,
     version = version,
     isAddingAccount = isAddingAccount,

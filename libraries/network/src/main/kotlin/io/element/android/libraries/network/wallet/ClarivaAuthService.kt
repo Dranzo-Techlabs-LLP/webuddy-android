@@ -10,6 +10,7 @@ package io.element.android.libraries.network.wallet
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.contentOrNull
@@ -255,6 +256,28 @@ class ClarivaAuthService(
             Result.failure(ClarivaAuthException(mapHttpError(e), e))
         } catch (e: Exception) {
             Timber.e(e, "reset-password failed")
+            Result.failure(ClarivaAuthException("Could not reach Clariva. Check your connection and try again.", e))
+        }
+    }
+
+    /**
+     * Save the just-signed-up consultant's payout bank account.
+     *
+     * Only works while the sign-up/sign-in token is still in memory: it is the
+     * proof of whose account this is, and it is not kept across restarts.
+     */
+    suspend fun saveMyBankDetails(request: ClarivaBankDetailsRequest): Result<Unit> {
+        val token = token ?: return Result.failure(ClarivaAuthException("Please sign in again to add bank details."))
+        return try {
+            clarivaAuthApi.saveMyBankDetails("Bearer $token", request)
+            Result.success(Unit)
+        } catch (e: HttpException) {
+            Timber.w(e, "Saving bank details failed with HTTP ${e.code()}")
+            Result.failure(ClarivaAuthException(serverMessage(e) ?: "Could not save bank details (error ${e.code()}).", e))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.e(e, "Saving bank details failed")
             Result.failure(ClarivaAuthException("Could not reach Clariva. Check your connection and try again.", e))
         }
     }

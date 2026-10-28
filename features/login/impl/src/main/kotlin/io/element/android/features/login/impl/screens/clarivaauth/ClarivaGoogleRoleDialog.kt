@@ -60,7 +60,7 @@ fun ClarivaGoogleRoleDialog(
         onDismissRequest = onDismiss,
         // "No" pre-selected, and a confirm button so accepting the default is a
         // single tap rather than a choice the user must actively re-make.
-        initialSelection = OPTION_NO,
+        initialSelection = if (prompt.hasChosenConsultant) OPTION_YES else OPTION_NO,
         confirmButtonTitle = stringResource(R.string.clariva_google_role_confirm),
         // The Google account-picker sheet has already run by this point; an
         // outside-tap or back-press dismiss would silently discard the sign-up.

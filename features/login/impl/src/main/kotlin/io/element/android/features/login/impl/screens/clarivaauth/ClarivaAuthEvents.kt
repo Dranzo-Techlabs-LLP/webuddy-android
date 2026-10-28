@@ -13,14 +13,30 @@ sealed interface ClarivaAuthEvents {
     data class SetName(val name: String) : ClarivaAuthEvents
     data class SetUsername(val username: String) : ClarivaAuthEvents
     data class SetIsConsultant(val isConsultant: Boolean) : ClarivaAuthEvents
+
+    // --- Optional consultant setup on sign-up (chat rate + payout bank account) ---
+    data class SetConsultantSetupField(val field: ConsultantSetupField, val value: String) : ClarivaAuthEvents
+    /** "Skip for now": nothing from the setup is saved; it can be done later in Settings. */
+    data object SkipConsultantSetup : ClarivaAuthEvents
+    /** Re-open a skipped setup. */
+    data object ResumeConsultantSetup : ClarivaAuthEvents
     data object ToggleMode : ClarivaAuthEvents
     data object Submit : ClarivaAuthEvents
 
     /** [idToken] comes from Google Credential Manager on the device. */
     data class SubmitGoogleIdToken(val idToken: String) : ClarivaAuthEvents
 
-    /** New Google user picked a role in the dialog; finish creating the account. */
-    data class ConfirmGoogleRole(val isConsultant: Boolean) : ClarivaAuthEvents
+    /**
+     * New Google user picked a role in the dialog; finish creating the account.
+     * [skipPayoutSetup] ignores whatever was typed on the payout step.
+     */
+    data class ConfirmGoogleRole(val isConsultant: Boolean, val skipPayoutSetup: Boolean = false) : ClarivaAuthEvents
+
+    /** Google user said they are a consultant: show the optional payout step before creating the account. */
+    data object ShowGooglePayoutStep : ClarivaAuthEvents
+
+    /** From the payout step back to "Are you a consultant?". */
+    data object BackToGoogleRole : ClarivaAuthEvents
 
     /** Dismissed the role dialog without choosing - abandon the sign-up. */
     data object CancelGoogleRole : ClarivaAuthEvents

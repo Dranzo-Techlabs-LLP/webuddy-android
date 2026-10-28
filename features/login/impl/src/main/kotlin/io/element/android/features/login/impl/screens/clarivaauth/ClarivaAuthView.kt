@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
@@ -60,7 +60,6 @@ import io.element.android.libraries.designsystem.preview.PreviewsDayNight
 import io.element.android.libraries.designsystem.theme.components.Button
 import io.element.android.libraries.designsystem.theme.components.Icon
 import io.element.android.libraries.designsystem.theme.components.OutlinedButton
-import io.element.android.libraries.designsystem.theme.components.Switch
 import io.element.android.libraries.designsystem.theme.components.Text
 import io.element.android.libraries.designsystem.theme.components.TextField
 import io.element.android.libraries.designsystem.theme.components.TextFieldValidity
@@ -244,11 +243,28 @@ fun ClarivaAuthView(
         // dismissible by tapping outside: an accidental dismiss would silently
         // abandon a sign-up that has already been through the Google sheet.
         state.googleRolePrompt?.let { prompt ->
-            ClarivaGoogleRoleDialog(
-                prompt = prompt,
-                onSelect = { state.eventSink(ClarivaAuthEvents.ConfirmGoogleRole(it)) },
-                onDismiss = { state.eventSink(ClarivaAuthEvents.CancelGoogleRole) },
-            )
+            if (prompt.isAskingPayouts) {
+                ClarivaGooglePayoutDialog(
+                    prompt = prompt,
+                    setup = state.consultantSetup,
+                    eventSink = state.eventSink,
+                )
+            } else {
+                ClarivaGoogleRoleDialog(
+                    prompt = prompt,
+                    // A consultant gets the same optional payout step as the email form.
+                    onSelect = { isConsultant ->
+                        state.eventSink(
+                            if (isConsultant) {
+                                ClarivaAuthEvents.ShowGooglePayoutStep
+                            } else {
+                                ClarivaAuthEvents.ConfirmGoogleRole(isConsultant = false)
+                            }
+                        )
+                    },
+                    onDismiss = { state.eventSink(ClarivaAuthEvents.CancelGoogleRole) },
+                )
+            }
         }
 
         state.forgotPassword?.let { fp ->
@@ -382,6 +398,9 @@ private fun ClarivaAuthForm(
 
         Spacer(Modifier.height(16.dp))
 
+        val hasSetupBelow = isSignUp && state.isConsultant && !state.consultantSetup.isSkipped
+        // Straight to the first setup field: moving "down" would land on the switch.
+        val setupFocusRequester = remember { FocusRequester() }
         var passwordVisible by remember { mutableStateOf(false) }
         if (state.isLoading) passwordVisible = false
 
@@ -411,11 +430,15 @@ private fun ClarivaAuthForm(
                     )
                 }
             },
+            // With the consultant setup open, "Next" carries on into it instead of submitting.
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Password,
-                imeAction = ImeAction.Done,
+                imeAction = if (hasSetupBelow) ImeAction.Next else ImeAction.Done,
             ),
-            keyboardActions = KeyboardActions(onDone = { onSubmit() }),
+            keyboardActions = KeyboardActions(
+                onNext = { setupFocusRequester.requestFocus() },
+                onDone = { onSubmit() },
+            ),
             singleLine = true,
         )
 
@@ -437,30 +460,11 @@ private fun ClarivaAuthForm(
 
         if (isSignUp) {
             Spacer(Modifier.height(20.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.clariva_auth_consultant_title),
-                        style = ElementTheme.typography.fontBodyMdMedium,
-                        color = ElementTheme.colors.textPrimary,
-                    )
-                    Text(
-                        text = stringResource(R.string.clariva_auth_consultant_subtitle),
-                        style = ElementTheme.typography.fontBodySmRegular,
-                        color = ElementTheme.colors.textSecondary,
-                    )
-                }
-                Switch(
-                    checked = state.isConsultant,
-                    enabled = !state.isLoading,
-                    onCheckedChange = { eventSink(ClarivaAuthEvents.SetIsConsultant(it)) },
-                    modifier = Modifier.testTag("clariva-auth-consultant"),
-                )
-            }
+            ClarivaConsultantSection(
+                state = state,
+                firstFieldFocusRequester = setupFocusRequester,
+                onSubmit = onSubmit,
+            )
         }
     }
 }
