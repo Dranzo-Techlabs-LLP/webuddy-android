@@ -8,6 +8,7 @@
 package io.element.android.features.login.impl.screens.clarivaauth
 
 import android.os.Parcelable
+import io.element.android.libraries.network.wallet.BankAccountRules
 import kotlinx.parcelize.Parcelize
 
 /** The fields of the optional consultant setup on the sign-up form. */
@@ -106,13 +107,12 @@ data class ConsultantSetupForm(
         const val MIN_MAX_CREDITS = 1
         const val MAX_MAX_CREDITS = 100_000
         const val MAX_CREDITS_MAX_DIGITS = 6
-        const val ACCOUNT_NUMBER_MAX_DIGITS = 18
-        const val IFSC_LENGTH = 11
-        const val MAX_TEXT_LENGTH = 120
-        private const val MIN_NAME_LENGTH = 2
-
-        // Kept in sync with the API's AddMyBankDetailDto.
-        val ACCOUNT_NUMBER_REGEX = Regex("^\\d{9,18}$")
-        val IFSC_REGEX = Regex("^[A-Z]{4}0[A-Z0-9]{6}$")
+        // Bank rules are shared with Settings > Bank Details.
+        const val ACCOUNT_NUMBER_MAX_DIGITS = BankAccountRules.ACCOUNT_NUMBER_MAX_DIGITS
+        const val IFSC_LENGTH = BankAccountRules.IFSC_LENGTH
+        const val MAX_TEXT_LENGTH = BankAccountRules.MAX_TEXT_LENGTH
+        private const val MIN_NAME_LENGTH = BankAccountRules.MIN_NAME_LENGTH
+        private val ACCOUNT_NUMBER_REGEX = BankAccountRules.ACCOUNT_NUMBER_REGEX
+        private val IFSC_REGEX = BankAccountRules.IFSC_REGEX
     }
 }

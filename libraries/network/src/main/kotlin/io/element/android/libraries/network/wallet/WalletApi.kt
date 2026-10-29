@@ -9,6 +9,7 @@ package io.element.android.libraries.network.wallet
 
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
@@ -31,10 +32,18 @@ interface WalletApi {
         @Body request: WalletUpdateRequest
     ): WalletResponse
 
-    @POST("v1/experts/bank-details")
-    suspend fun postBankDetails(
-        @Body request: BankDetails
-    )
+    /** The caller's saved payout account; authorised by the session's Matrix access token. */
+    @GET("v1/experts/me/bank-details")
+    suspend fun getMyBankDetails(
+        @Header("Authorization") bearer: String,
+    ): MyBankAccountResponse
+
+    /** Save (replace) the caller's payout account; authorised by the session's Matrix access token. */
+    @POST("v1/experts/me/bank-details")
+    suspend fun saveMyBankDetails(
+        @Header("Authorization") bearer: String,
+        @Body request: ClarivaBankDetailsRequest,
+    ): SavedBankAccount
 
     @POST("v1/wallet/recharge")
     suspend fun createOrder(

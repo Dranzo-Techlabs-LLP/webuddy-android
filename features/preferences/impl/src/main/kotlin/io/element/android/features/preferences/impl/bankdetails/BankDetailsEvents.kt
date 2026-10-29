@@ -15,4 +15,6 @@ sealed interface BankDetailsEvents {
     data class SetBranchName(val branchName: String) : BankDetailsEvents
     object Save : BankDetailsEvents
     object ClearActionError : BankDetailsEvents
+    /** Load the saved account again after a failed load. */
+    object RetryLoad : BankDetailsEvents
 }

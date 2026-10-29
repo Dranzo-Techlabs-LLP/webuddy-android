@@ -247,6 +247,7 @@ fun ClarivaAuthView(
                 ClarivaGooglePayoutDialog(
                     prompt = prompt,
                     setup = state.consultantSetup,
+                    ifscStatus = state.ifscStatus,
                     eventSink = state.eventSink,
                 )
             } else {

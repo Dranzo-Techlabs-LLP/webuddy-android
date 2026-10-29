@@ -56,6 +56,10 @@
     <string name="clariva_signup_ifsc_label">IFSC code</string>
     <string name="clariva_signup_ifsc_placeholder">e.g. SBIN0001234</string>
     <string name="clariva_signup_branch_label">Branch name (optional)</string>
+    <!-- Live IFSC check against the IFSC directory. -->
+    <string name="clariva_signup_ifsc_checking">Checking IFSC…</string>
+    <string name="clariva_signup_ifsc_not_found">No bank branch found for this IFSC. Please check the code.</string>
+    <string name="clariva_signup_ifsc_unavailable">Couldn\'t verify this IFSC right now. It will be checked when you save.</string>
     <string name="clariva_signup_setup_skip">Skip for now</string>
     <string name="clariva_signup_setup_skipped">Payout setup skipped. You can add your chat rate and bank details later in Settings › Billing and payments.</string>
     <string name="clariva_signup_setup_resume">Add now</string>

@@ -9,6 +9,7 @@ package io.element.android.features.login.impl.screens.clarivaauth
 
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import io.element.android.libraries.architecture.AsyncData
+import io.element.android.libraries.network.wallet.IfscStatus
 
 open class ClarivaAuthStateProvider : PreviewParameterProvider<ClarivaAuthState> {
     override val values: Sequence<ClarivaAuthState>
@@ -100,6 +101,7 @@ fun aClarivaAuthState(
     emailAvailability: EmailAvailability = EmailAvailability.Unknown,
     isConsultant: Boolean = false,
     consultantSetup: ConsultantSetupForm = ConsultantSetupForm(),
+    ifscStatus: IfscStatus = IfscStatus.None,
     productionApplicationName: String = "Clariva",
     version: String = "26.01.3",
     isAddingAccount: Boolean = false,
@@ -117,6 +119,7 @@ fun aClarivaAuthState(
     emailAvailability = emailAvailability,
     isConsultant = isConsultant,
     consultantSetup = consultantSetup,
+    ifscStatus = ifscStatus,
     productionApplicationName = productionApplicationName,
     version = version,
     isAddingAccount = isAddingAccount,

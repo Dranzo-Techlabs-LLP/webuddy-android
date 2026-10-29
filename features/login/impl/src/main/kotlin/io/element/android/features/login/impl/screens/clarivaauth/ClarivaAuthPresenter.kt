@@ -33,8 +33,12 @@ import io.element.android.libraries.matrix.api.auth.external.ExternalSession
 import io.element.android.libraries.matrix.api.core.SessionId
 import io.element.android.libraries.matrix.api.encryption.RecoveryException
 import io.element.android.libraries.matrix.api.encryption.RecoveryState
+import io.element.android.libraries.network.wallet.BankAccountRules
 import io.element.android.libraries.network.wallet.ClarivaAuthService
 import io.element.android.libraries.network.wallet.ClarivaBankDetailsRequest
+import io.element.android.libraries.network.wallet.IfscBranch
+import io.element.android.libraries.network.wallet.IfscLookup
+import io.element.android.libraries.network.wallet.IfscStatus
 import io.element.android.libraries.network.wallet.WalletService
 import io.element.android.libraries.sessionstorage.api.SessionStore
 import kotlinx.coroutines.CoroutineScope
@@ -70,6 +74,7 @@ class ClarivaAuthPresenter(
     private val walletService: WalletService,
     // App-wide, so a message posted here shows on the home screen after sign-up.
     private val snackbarDispatcher: SnackbarDispatcher,
+    private val ifscLookup: IfscLookup,
 ) : Presenter<ClarivaAuthState> {
     // Homeserver discovery (a .well-known network round-trip) is independent of the user's
     // credentials, so we pre-warm it as soon as the auth screen opens. By the time the user
@@ -101,6 +106,9 @@ class ClarivaAuthPresenter(
         var username by rememberSaveable { mutableStateOf("") }
         var isConsultant by rememberSaveable { mutableStateOf(false) }
         var consultantSetup by rememberSaveable { mutableStateOf(ConsultantSetupForm()) }
+        var ifscStatus by remember { mutableStateOf<IfscStatus>(IfscStatus.None) }
+        // What the last lookup filled in, so a new IFSC can replace it but never a value the user typed.
+        var ifscAutofill by remember { mutableStateOf<IfscBranch?>(null) }
         var authAction by remember { mutableStateOf<AsyncData<Unit>>(AsyncData.Uninitialized) }
         var googleRolePrompt by remember { mutableStateOf<GoogleRolePrompt?>(null) }
         var forgotPassword by remember { mutableStateOf<ForgotPasswordState?>(null) }
@@ -151,6 +159,29 @@ class ClarivaAuthPresenter(
                 result == null -> EmailAvailability.Unknown
                 result.available -> EmailAvailability.Available
                 else -> EmailAvailability.Taken
+            }
+        }
+
+        // Look the payout IFSC up once it is well-formed: a code with no branch would only show
+        // up as a failed payout, and a found one fills in the bank and branch.
+        val normalizedIfsc = consultantSetup.normalizedIfsc
+        LaunchedEffect(normalizedIfsc) {
+            if (!BankAccountRules.isValidIfsc(normalizedIfsc)) {
+                ifscStatus = IfscStatus.None
+                return@LaunchedEffect
+            }
+            ifscStatus = IfscStatus.Checking
+            delay(IFSC_LOOKUP_DEBOUNCE_MS)
+            val status = ifscLookup.lookup(normalizedIfsc)
+            ifscStatus = status
+            if (status is IfscStatus.Found) {
+                val found = status.branch
+                val previous = ifscAutofill
+                consultantSetup = consultantSetup.copy(
+                    bankName = consultantSetup.bankName.takeUnless { it.isBlank() || it == previous?.bank } ?: found.bank,
+                    branchName = consultantSetup.branchName.takeUnless { it.isBlank() || it == previous?.branch } ?: found.branch,
+                )
+                ifscAutofill = found
             }
         }
 
@@ -241,7 +272,7 @@ class ClarivaAuthPresenter(
                     val prompt = googleRolePrompt ?: return@handleEvent
                     val setupToSave = if (event.isConsultant && !event.skipPayoutSetup) {
                         // "Continue" is disabled on an invalid setup; never drop it silently.
-                        if (!consultantSetup.isValid) return@handleEvent
+                        if (!consultantSetup.isValid || ifscStatus.blocksSave) return@handleEvent
                         consultantSetup.takeIf { it.hasAnythingToSave }
                     } else {
                         null
@@ -369,6 +400,7 @@ class ClarivaAuthPresenter(
             emailAvailability = emailAvailability,
             isConsultant = isConsultant,
             consultantSetup = consultantSetup,
+            ifscStatus = ifscStatus,
             productionApplicationName = buildMeta.productionApplicationName,
             version = buildMeta.versionName,
             isAddingAccount = isAddingAccount,
@@ -638,6 +670,9 @@ class ClarivaAuthPresenter(
          * than hanging it - history access is retried on the next sign-in.
          */
         const val RECOVERY_STATE_TIMEOUT = 20_000L
+
+        /** Long enough that pasting or fast typing triggers one IFSC lookup, not one per key. */
+        const val IFSC_LOOKUP_DEBOUNCE_MS = 300L
 
         /** Per call; the chat rate and bank account are saved in parallel. */
         const val CONSULTANT_SETUP_TIMEOUT = 10_000L

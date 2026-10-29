@@ -53,6 +53,7 @@ import io.element.android.libraries.designsystem.theme.components.Text
 import io.element.android.libraries.designsystem.theme.components.TextButton
 import io.element.android.libraries.designsystem.theme.components.TextField
 import io.element.android.libraries.designsystem.theme.components.TextFieldValidity
+import io.element.android.libraries.network.wallet.IfscStatus
 
 /**
  * The "I am a consultant" switch, and below it - only once it is on - the
@@ -119,6 +120,7 @@ internal fun ClarivaConsultantSection(
                 } else {
                     ConsultantSetupFields(
                         setup = state.consultantSetup,
+                        ifscStatus = state.ifscStatus,
                         enabled = !state.isLoading,
                         holderNameHint = state.name,
                         eventSink = state.eventSink,
@@ -141,6 +143,7 @@ internal fun ClarivaConsultantSection(
 @Composable
 internal fun ConsultantSetupFields(
     setup: ConsultantSetupForm,
+    ifscStatus: IfscStatus,
     enabled: Boolean,
     holderNameHint: String?,
     eventSink: (ClarivaAuthEvents) -> Unit,
@@ -277,8 +280,12 @@ internal fun ConsultantSetupFields(
                 .fillMaxWidth()
                 .testTag("clariva-signup-ifsc"),
             placeholder = stringResource(R.string.clariva_signup_ifsc_placeholder),
-            supportingText = setup.ifscError,
-            validity = if (setup.ifscError != null) TextFieldValidity.Invalid else TextFieldValidity.None,
+            supportingText = setup.ifscError ?: ifscStatusText(ifscStatus),
+            validity = when {
+                setup.ifscError != null || ifscStatus is IfscStatus.NotFound -> TextFieldValidity.Invalid
+                ifscStatus is IfscStatus.Found -> TextFieldValidity.Valid
+                else -> TextFieldValidity.None
+            },
             keyboardOptions = KeyboardOptions(
                 capitalization = KeyboardCapitalization.Characters,
                 keyboardType = KeyboardType.Ascii,
@@ -344,6 +351,16 @@ internal fun ConsultantSetupFields(
             )
         }
     }
+}
+
+/** What the IFSC lookup found, shown under the field. */
+@Composable
+private fun ifscStatusText(status: IfscStatus): String? = when (status) {
+    IfscStatus.None -> null
+    IfscStatus.Checking -> stringResource(R.string.clariva_signup_ifsc_checking)
+    is IfscStatus.Found -> status.branch.summary
+    IfscStatus.NotFound -> stringResource(R.string.clariva_signup_ifsc_not_found)
+    IfscStatus.Unavailable -> stringResource(R.string.clariva_signup_ifsc_unavailable)
 }
 
 /** "Set up payouts  [Optional]" and the line under it. */

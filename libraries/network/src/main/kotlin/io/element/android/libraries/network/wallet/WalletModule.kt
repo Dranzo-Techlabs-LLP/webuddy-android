@@ -31,6 +31,13 @@ object WalletModule {
 
     @Provides
     @SingleIn(AppScope::class)
+    fun providesIfscApi(retrofitFactory: RetrofitFactory): IfscApi {
+        return retrofitFactory.create(IfscApi.BASE_URL)
+            .create(IfscApi::class.java)
+    }
+
+    @Provides
+    @SingleIn(AppScope::class)
     fun providesClarivaAuthApi(retrofitFactory: RetrofitFactory): ClarivaAuthApi {
         return retrofitFactory.create(ClarivaConfig.API_BASE_URL)
             .create(ClarivaAuthApi::class.java)

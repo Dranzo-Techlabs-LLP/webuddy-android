@@ -8,6 +8,7 @@
 package io.element.android.features.login.impl.screens.clarivaauth
 
 import io.element.android.libraries.architecture.AsyncData
+import io.element.android.libraries.network.wallet.IfscStatus
 
 enum class ClarivaAuthMode {
     SignUp,
@@ -98,6 +99,8 @@ data class ClarivaAuthState(
     val isConsultant: Boolean,
     /** Optional chat rate + bank account; only shown, and only saved, for a consultant. */
     val consultantSetup: ConsultantSetupForm,
+    /** Live check of the setup's IFSC against the IFSC directory. */
+    val ifscStatus: IfscStatus,
     /** Shown in the welcome message, e.g. "the fastest Clariva ever". */
     val productionApplicationName: String,
     /** App version, shown at the foot of the landing page as the old welcome screen did. */
@@ -173,8 +176,12 @@ data class ClarivaAuthState(
                     emailAvailability != EmailAvailability.Taken &&
                     // The setup is optional, but what IS typed must be valid -
                     // half a bank account would otherwise be silently dropped.
-                    (!isConsultant || consultantSetup.isValid)
+                    (!isConsultant || isConsultantSetupReady)
         }
+
+    /** The optional setup is skipped, or valid with an IFSC that is not known to be wrong. */
+    val isConsultantSetupReady: Boolean
+        get() = consultantSetup.isSkipped || (consultantSetup.isValid && !ifscStatus.blocksSave)
 
     companion object {
         // Must match the API's @MinLength(8) or the server rejects with a 400.

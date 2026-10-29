@@ -32,6 +32,7 @@ import io.element.android.libraries.designsystem.theme.components.Button
 import io.element.android.libraries.designsystem.theme.components.ButtonSize
 import io.element.android.libraries.designsystem.theme.components.Surface
 import io.element.android.libraries.designsystem.theme.components.TextButton
+import io.element.android.libraries.network.wallet.IfscStatus
 
 /**
  * Second step of Google sign-up for a consultant: the same optional chat rate
@@ -45,10 +46,13 @@ import io.element.android.libraries.designsystem.theme.components.TextButton
 internal fun ClarivaGooglePayoutDialog(
     prompt: GoogleRolePrompt,
     setup: ConsultantSetupForm,
+    ifscStatus: IfscStatus,
     eventSink: (ClarivaAuthEvents) -> Unit,
 ) {
+    val canContinue = setup.isValid && !ifscStatus.blocksSave
+
     fun confirm() {
-        if (setup.isValid) eventSink(ClarivaAuthEvents.ConfirmGoogleRole(isConsultant = true))
+        if (canContinue) eventSink(ClarivaAuthEvents.ConfirmGoogleRole(isConsultant = true))
     }
 
     Dialog(
@@ -83,6 +87,7 @@ internal fun ClarivaGooglePayoutDialog(
                     Spacer(Modifier.height(16.dp))
                     ConsultantSetupFields(
                         setup = setup,
+                        ifscStatus = ifscStatus,
                         enabled = true,
                         holderNameHint = prompt.name,
                         eventSink = eventSink,
@@ -96,7 +101,7 @@ internal fun ClarivaGooglePayoutDialog(
                     Button(
                         text = stringResource(R.string.clariva_google_role_confirm),
                         onClick = ::confirm,
-                        enabled = setup.isValid,
+                        enabled = canContinue,
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("clariva-google-payout-continue"),
@@ -134,6 +139,7 @@ internal fun ClarivaGooglePayoutDialogPreview() = ElementPreview {
     ClarivaGooglePayoutDialog(
         prompt = GoogleRolePrompt(idToken = "tok", email = "jane@example.com", name = "Jane Doe", isAskingPayouts = true),
         setup = ConsultantSetupForm(maxCredits = "50", ifscCode = "sbin"),
+        ifscStatus = IfscStatus.None,
         eventSink = {},
     )
 }

@@ -19,10 +19,14 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import retrofit2.HttpException
 import timber.log.Timber
@@ -462,14 +466,46 @@ class WalletService @Inject constructor(
         }
     }
 
-    suspend fun saveBankDetails(bankDetails: BankDetails) {
-        try {
-            walletApi.postBankDetails(bankDetails)
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to save bank details")
+    /** [userId]'s saved payout account, or null when none is saved yet. */
+    suspend fun getMyBankDetails(userId: String): Result<SavedBankAccount?> = withSessionToken(userId) { bearer ->
+        walletApi.getMyBankDetails(bearer).bankDetail
+    }
+
+    /** Save [userId]'s payout account, replacing the previous one. */
+    suspend fun saveMyBankDetails(userId: String, request: ClarivaBankDetailsRequest): Result<SavedBankAccount> =
+        withSessionToken(userId) { bearer -> walletApi.saveMyBankDetails(bearer, request) }
+
+    /**
+     * Runs a call authorised by [userId]'s Matrix access token: the API checks it with the
+     * homeserver, so a caller can only ever reach their own account. Unlike the Clariva JWT,
+     * the app always holds this token.
+     */
+    private suspend fun <T> withSessionToken(userId: String, block: suspend (String) -> T): Result<T> {
+        val accessToken = sessionStore.getSession(userId)?.accessToken
+            ?: return Result.failure(IllegalStateException("No session for $userId"))
+        return try {
+            Result.success(block("Bearer $accessToken"))
+        } catch (e: CancellationException) {
             throw e
+        } catch (e: HttpException) {
+            Timber.e(e, "Bank details call failed for $userId with HTTP ${e.code()}")
+            Result.failure(WalletApiException(e.code(), e.serverMessage(), e))
+        } catch (e: Exception) {
+            Timber.e(e, "Bank details call failed for $userId")
+            Result.failure(e)
         }
     }
+
+    /** Nest's error envelope carries `message` as a string or a list of strings. */
+    private fun HttpException.serverMessage(): String? = runCatching {
+        val raw = response()?.errorBody()?.string().orEmpty()
+        val message = Json.parseToJsonElement(raw).jsonObject["message"]
+        when (message) {
+            is JsonArray -> message.mapNotNull { it.jsonPrimitive.contentOrNull }.joinToString("\n")
+            null -> null
+            else -> message.jsonPrimitive.contentOrNull
+        }?.takeIf { it.isNotBlank() }
+    }.getOrNull()
 
     suspend fun createOrder(userId: String, amount: Double): Result<CreateOrderResponse> {
         return try {
