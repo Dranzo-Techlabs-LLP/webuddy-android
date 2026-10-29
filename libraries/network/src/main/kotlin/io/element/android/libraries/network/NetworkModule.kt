@@ -41,7 +41,9 @@ object NetworkModule {
     @SingleIn(AppScope::class)
     fun providesHttpLoggingInterceptor(): HttpLoggingInterceptor {
         val logger = FormattedJsonHttpLogger(HttpLoggingInterceptor.Level.BODY)
-        return HttpLoggingInterceptor(logger)
+        // Wallet API calls carry the Matrix access token or the Clariva JWT as a Bearer header;
+        // never write either to logcat or into bug reports.
+        return HttpLoggingInterceptor(logger).apply { redactHeader("Authorization") }
     }
 
     @Provides
